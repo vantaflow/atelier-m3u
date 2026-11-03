@@ -1,0 +1,12 @@
+{
+  "name": "atelier-m3u",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Éditeur de playlists IPTV M3U en ligne : direct, films et séries",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "npm run build && npx wrangler@3 pages dev public",
+    "deploy": "npm run build && npx wrangler@3 pages deploy public --project-name atelier-m3u --branch main"
+  }
+}

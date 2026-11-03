@@ -1,0 +1,1325 @@
+<title>Atelier M3U</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout : régie de diffusion — barre de commande, rail des groupes, grille des chaînes virtualisée, inspecteur du flux. */
+:root{
+  --bg:#0e1318; --panel:#151c24; --raise:#1c2530; --line:#283341; --line2:#344253;
+  --fg:#e5ecf3; --mute:#8696a8; --faint:#5d6c7d;
+  --accent:#f3a324; --accent-ink:#1b1204; --accent-soft:rgba(243,163,36,.14);
+  --live:#ff5a52; --ok:#3ccf8f; --info:#5aa9ff;
+  --sel:rgba(243,163,36,.11); --shadow:0 18px 50px rgba(0,0,0,.45);
+  --f-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --r:7px; color-scheme:dark;
+}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]){
+  --bg:#eef1f5; --panel:#ffffff; --raise:#f4f6f9; --line:#d7dee7; --line2:#c3cdd9;
+  --fg:#111821; --mute:#566476; --faint:#8592a2;
+  --accent:#b66a00; --accent-ink:#ffffff; --accent-soft:rgba(182,106,0,.12);
+  --live:#d32f2f; --ok:#12865a; --info:#1f6fd1;
+  --sel:rgba(182,106,0,.09); --shadow:0 18px 50px rgba(20,30,45,.18); color-scheme:light;
+}}
+:root[data-theme="light"]{
+  --bg:#eef1f5; --panel:#ffffff; --raise:#f4f6f9; --line:#d7dee7; --line2:#c3cdd9;
+  --fg:#111821; --mute:#566476; --faint:#8592a2;
+  --accent:#b66a00; --accent-ink:#ffffff; --accent-soft:rgba(182,106,0,.12);
+  --live:#d32f2f; --ok:#12865a; --info:#1f6fd1;
+  --sel:rgba(182,106,0,.09); --shadow:0 18px 50px rgba(20,30,45,.18); color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font:14px/1.45 var(--f-body);overflow:hidden}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+
+.app{height:100%;display:grid;grid-template-rows:auto minmax(0,1fr) auto;gap:10px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px}
+
+/* Barre du haut */
+.top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;margin-right:6px}
+.mark{display:grid;grid-template-columns:repeat(7,4px);height:22px;border-radius:3px;overflow:hidden}
+.mark i{display:block}
+.brand h1{font:700 22px/1 var(--f-display);letter-spacing:.04em;text-transform:uppercase;margin:0;white-space:nowrap}
+.brand h1 span{color:var(--accent)}
+.pname{min-width:0;flex:0 1 220px;background:transparent;border:1px solid transparent;border-radius:var(--r);padding:6px 8px;font-weight:500}
+.pname:hover,.pname:focus{border-color:var(--line2);background:var(--panel)}
+.spacer{flex:1}
+.btn{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px;border-radius:var(--r);border:1px solid var(--line2);background:var(--panel);cursor:pointer;white-space:nowrap;font-weight:500}
+.btn:hover{border-color:var(--mute)}
+.btn:disabled{opacity:.4;cursor:default}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.btn.pri:hover{filter:brightness(1.07)}
+.btn.ghost{background:transparent;border-color:transparent}
+.btn.ghost:hover{background:var(--raise)}
+.btn.danger{color:var(--live)}
+.btn.sm{height:28px;padding:0 9px;font-size:13px}
+.btn.icon{width:34px;padding:0;justify-content:center}
+.btn svg,.ib svg{width:16px;height:16px;flex:none}
+.ib{width:28px;height:28px;display:inline-grid;place-items:center;border:0;background:transparent;border-radius:6px;cursor:pointer;color:var(--mute)}
+.ib:hover{background:var(--raise);color:var(--fg)}
+.kbd{font:11px var(--f-mono);color:var(--faint)}
+.wrapm{position:relative}
+.menu{position:absolute;top:calc(100% + 6px);right:0;z-index:40;min-width:250px;background:var(--panel);border:1px solid var(--line2);border-radius:10px;box-shadow:var(--shadow);padding:6px;display:grid}
+.menu button{display:flex;gap:10px;align-items:center;text-align:left;border:0;background:transparent;padding:8px 10px;border-radius:6px;cursor:pointer}
+.menu button:hover{background:var(--raise)}
+.menu button small{margin-left:auto;color:var(--faint);font-size:12px}
+.menu hr{border:0;border-top:1px solid var(--line);margin:4px 2px}
+
+/* Zone principale */
+.main{min-height:0;display:grid;grid-template-columns:250px minmax(0,1fr) 350px;gap:10px}
+.pane{background:var(--panel);border:1px solid var(--line);border-radius:10px;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.ph{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)}
+.ph h2{font:600 15px/1 var(--f-display);letter-spacing:.08em;text-transform:uppercase;margin:0;color:var(--mute)}
+.ph .spacer{flex:1}
+
+/* Groupes */
+.groups{overflow:auto;padding:6px;display:grid;gap:1px;align-content:start}
+.g{display:grid;grid-template-columns:14px minmax(0,1fr) auto 26px;align-items:center;gap:6px;padding:6px 6px 6px 4px;border-radius:6px;cursor:pointer;user-select:none}
+.g:hover{background:var(--raise)}
+.g.on{background:var(--accent-soft)}
+.g.on .gn{color:var(--fg);font-weight:600}
+.g.off .gn,.g.off .gc{opacity:.45;text-decoration:line-through}
+.g.drop{box-shadow:inset 0 0 0 2px var(--accent)}
+.g.dropb{box-shadow:inset 0 2px 0 var(--accent)}
+.grip{color:var(--faint);cursor:grab;font-size:11px;letter-spacing:-2px;text-align:center}
+.gn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gc{font:12px var(--f-mono);color:var(--faint);font-variant-numeric:tabular-nums}
+.g .ib{width:24px;height:24px;opacity:.0}
+.g:hover .ib,.g.off .ib{opacity:1}
+.g.all{grid-template-columns:14px minmax(0,1fr) auto;font-weight:500}
+.gsep{font:600 11px var(--f-display);letter-spacing:.12em;text-transform:uppercase;color:var(--faint);padding:10px 8px 4px}
+
+/* Liste */
+.lbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:10px;border-bottom:1px solid var(--line)}
+.search{flex:1 1 260px;min-width:0;display:flex;align-items:center;gap:0;border:1px solid var(--line2);border-radius:var(--r);background:var(--bg);height:34px}
+.search svg{width:16px;height:16px;margin:0 6px 0 10px;color:var(--faint);flex:none}
+.search input{flex:1;min-width:0;border:0;background:transparent;outline:0;height:100%}
+.search.bad{border-color:var(--live)}
+.search select{border:0;border-left:1px solid var(--line);background:transparent;height:100%;padding:0 6px;color:var(--mute);max-width:110px}
+.tog{height:100%;border:0;border-left:1px solid var(--line);background:transparent;padding:0 10px;font:12px var(--f-mono);color:var(--faint);cursor:pointer;border-radius:0 var(--r) var(--r) 0}
+.tog.on{color:var(--accent);background:var(--accent-soft)}
+.sel{height:34px;border:1px solid var(--line2);border-radius:var(--r);background:var(--panel);padding:0 8px;max-width:170px}
+.listwrap{position:relative;flex:1;min-height:0;display:flex;flex-direction:column;container-type:inline-size}
+.lhead,.row{display:grid;grid-template-columns:30px 46px 38px minmax(0,1.4fr) minmax(0,.8fr) minmax(0,1.1fr) 64px;align-items:center;gap:8px;padding:0 10px}
+.lhead{height:34px;border-bottom:1px solid var(--line);font:600 12px var(--f-display);letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+.list{flex:1;min-height:0;overflow:auto;position:relative}
+.spc{position:relative}
+.rows{position:absolute;left:0;right:0;top:0}
+.row{height:48px;border-bottom:1px solid var(--line);cursor:default;position:relative}
+.row:hover{background:var(--raise)}
+.row.s{background:var(--sel)}
+.row.cur{box-shadow:inset 3px 0 0 var(--accent)}
+.row.x{opacity:.45}
+.row.db::before,.row.da::after{content:"";position:absolute;left:0;right:0;height:2px;background:var(--accent);z-index:2}
+.row.db::before{top:-1px}.row.da::after{bottom:-1px}
+.row input[type=checkbox],.lhead input[type=checkbox]{width:16px;height:16px;accent-color:var(--accent);margin:0}
+.num{font:12px var(--f-mono);color:var(--faint);font-variant-numeric:tabular-nums;text-align:right}
+.logo{width:34px;height:34px;border-radius:6px;background:var(--raise);border:1px solid var(--line);display:grid;place-items:center;overflow:hidden;position:relative;flex:none}
+.logo b{font:700 12px var(--f-display);letter-spacing:.04em;color:var(--mute)}
+.logo img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:var(--raise)}
+.nm{min-width:0;display:grid;gap:1px}
+.nm .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
+.nm .u{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:11.5px var(--f-mono);color:var(--faint)}
+.cg{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--mute);font-size:13px}
+.cu{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:12px var(--f-mono);color:var(--mute)}
+.ra{display:flex;justify-content:flex-end;gap:2px}
+.pill{display:inline-flex;align-items:center;height:18px;padding:0 6px;border-radius:4px;font:600 10.5px var(--f-mono);letter-spacing:.03em;margin-right:6px;vertical-align:1px;border:1px solid currentColor}
+.p-live{color:var(--live)}.p-film{color:var(--info)}.p-serie{color:var(--ok)}.p-radio{color:var(--accent)}
+@container (max-width:760px){.lhead,.row{grid-template-columns:30px 40px 38px minmax(0,1fr) 64px}.c-grp,.c-url{display:none}}
+@container (max-width:420px){.lhead,.row{grid-template-columns:28px 38px minmax(0,1fr) 34px}.c-num{display:none}.ra .ib:not(.play){display:none}}
+.empty{position:absolute;inset:34px 0 0;display:grid;place-items:center;text-align:center;padding:24px;color:var(--mute)}
+.empty h3{font:600 22px var(--f-display);letter-spacing:.03em;color:var(--fg);margin:0 0 6px}
+.empty p{margin:0 0 14px;max-width:46ch}
+.dropzone-on .listwrap::after{content:"Déposez vos fichiers M3U ici";position:absolute;inset:8px;border:2px dashed var(--accent);border-radius:10px;display:grid;place-items:center;background:var(--accent-soft);font:600 20px var(--f-display);letter-spacing:.05em;color:var(--fg);z-index:20}
+
+/* Onglets de type et vue affiches */
+.ttabs{display:flex;align-items:center;gap:2px;padding:0 10px;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
+.ttabs::-webkit-scrollbar{display:none}
+.ttabs button{border:0;background:transparent;padding:9px 10px 8px;cursor:pointer;color:var(--mute);border-bottom:2px solid transparent;white-space:nowrap;font:600 14px var(--f-display);letter-spacing:.06em;text-transform:uppercase;display:flex;gap:6px;align-items:baseline}
+.ttabs button small{font:11px var(--f-mono);color:var(--faint);letter-spacing:0}
+.ttabs button.on{color:var(--fg);border-color:var(--accent)}
+.ttabs .vm{margin-left:auto;display:flex;gap:2px;padding-left:8px}
+.ttabs .vm button{padding:6px;border:0;border-radius:6px;color:var(--faint)}
+.ttabs .vm button.on{color:var(--accent);background:var(--accent-soft)}
+.ttabs .vm svg{width:16px;height:16px;display:block}
+.listwrap.grid .lhead{display:none}
+.rows.grid{display:grid;gap:12px;padding:12px}
+.card{display:grid;grid-template-rows:auto auto;gap:6px;cursor:pointer;min-width:0;border-radius:8px;padding:6px;position:relative}
+.card:hover{background:var(--raise)}
+.card.s{background:var(--sel);box-shadow:inset 0 0 0 1px var(--accent)}
+.card.cur{box-shadow:inset 0 0 0 2px var(--accent)}
+.card.x{opacity:.45}
+.poster{aspect-ratio:2/3;max-width:100%;border-radius:6px;background:var(--raise);border:1px solid var(--line);position:relative;overflow:hidden;display:grid;place-items:center}
+.poster b{font:700 30px var(--f-display);color:var(--faint);letter-spacing:.04em}
+.poster img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.poster .pill{position:absolute;left:6px;top:6px;background:var(--panel);margin:0}
+.poster .rt{position:absolute;right:6px;top:6px;background:var(--accent);color:var(--accent-ink);font:600 11px var(--f-mono);padding:1px 5px;border-radius:4px}
+.poster input{position:absolute;right:6px;bottom:6px;width:18px;height:18px;accent-color:var(--accent);margin:0}
+.card .ct{font-weight:500;font-size:13px;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.5em}
+.card .cs{font:11.5px var(--f-mono);color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* Inspecteur */
+.insp{overflow:auto;padding:14px;display:grid;gap:14px;align-content:start}
+.ihead{display:flex;gap:12px;align-items:center}
+.ihead .logo{width:56px;height:56px;border-radius:9px}
+.ihead .logo b{font-size:18px}
+.ihead h3{font:600 20px/1.15 var(--f-display);letter-spacing:.02em;margin:0;word-break:break-word;text-wrap:balance}
+.ihead .meta{font:12px var(--f-mono);color:var(--faint)}
+.fs{display:grid;gap:10px}
+.fs>h4{font:600 12px var(--f-display);letter-spacing:.12em;text-transform:uppercase;color:var(--faint);margin:4px 0 0;display:flex;align-items:center;gap:8px}
+.fs>h4::after{content:"";flex:1;border-top:1px solid var(--line)}
+.fld{display:grid;gap:4px;min-width:0}
+.fld label{font-size:12px;color:var(--mute);display:flex;justify-content:space-between;gap:8px}
+.fld label code{font:11px var(--f-mono);color:var(--faint)}
+.in,.ta{width:100%;min-width:0;border:1px solid var(--line2);border-radius:6px;background:var(--bg);padding:7px 9px;outline:0}
+.in:focus,.ta:focus{border-color:var(--accent)}
+.in.mono,.ta{font:12.5px var(--f-mono)}
+.ta{resize:vertical;min-height:64px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.three{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.inrow{display:flex;gap:6px}
+.inrow .in{flex:1}
+.kv{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.3fr) 28px;gap:6px;align-items:center}
+.raw{font:11.5px/1.5 var(--f-mono);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px 10px;white-space:pre-wrap;word-break:break-all;color:var(--mute);max-height:180px;overflow:auto}
+.raw .k{color:var(--accent)}
+.acts{display:flex;flex-wrap:wrap;gap:6px}
+.ihint{color:var(--mute);font-size:13px;display:grid;gap:10px}
+.ihint ul{margin:0;padding-left:18px;display:grid;gap:4px}
+.kb{font:11px var(--f-mono);border:1px solid var(--line2);border-bottom-width:2px;border-radius:4px;padding:0 5px;color:var(--fg);background:var(--raise)}
+.big{font:700 34px/1 var(--f-display);letter-spacing:.02em}
+
+/* Barre d'état */
+.status{display:flex;gap:16px;flex-wrap:wrap;align-items:center;font:12px var(--f-mono);color:var(--faint);font-variant-numeric:tabular-nums}
+.status b{color:var(--fg);font-weight:500}
+.chip{display:inline-flex;align-items:center;gap:6px;height:20px;padding:0 8px;border-radius:10px;background:var(--accent-soft);color:var(--accent);font:600 11px var(--f-body)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--ok);display:inline-block}
+
+/* Fenêtres */
+.ov{position:fixed;inset:0;z-index:60;background:rgba(5,8,12,.55);display:grid;place-items:center;
+  padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.sheet{width:min(640px,100%);max-height:100%;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line2);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
+.sheet.wide{width:min(900px,100%)}
+.sh{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line)}
+.sh h3{font:600 20px/1 var(--f-display);letter-spacing:.03em;margin:0;flex:1}
+.sb{padding:16px;overflow:auto;display:grid;gap:14px;min-height:0}
+.sf{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;padding:12px 16px;border-top:1px solid var(--line);background:var(--raise)}
+.note{font-size:13px;color:var(--mute)}
+.note.warn{color:var(--accent)}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:-4px 0 0}
+.tabs button{border:0;background:transparent;padding:8px 12px;cursor:pointer;color:var(--mute);border-bottom:2px solid transparent;font-weight:500}
+.tabs button.on{color:var(--fg);border-color:var(--accent)}
+.drop{border:2px dashed var(--line2);border-radius:10px;padding:26px;text-align:center;color:var(--mute);cursor:pointer;display:grid;gap:6px}
+.drop:hover,.drop.on{border-color:var(--accent);background:var(--accent-soft)}
+.drop strong{color:var(--fg);font:600 18px var(--f-display);letter-spacing:.03em}
+.opts{display:grid;gap:8px}
+.chk{display:flex;gap:9px;align-items:flex-start;cursor:pointer}
+.chk input{accent-color:var(--accent);width:16px;height:16px;margin:2px 0 0}
+.seg{display:inline-flex;border:1px solid var(--line2);border-radius:var(--r);overflow:hidden;flex-wrap:wrap}
+.seg label{display:flex;align-items:center;cursor:pointer}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg span{padding:6px 11px;font-size:13px;color:var(--mute);border-right:1px solid var(--line)}
+.seg label:last-child span{border-right:0}
+.seg input:checked+span{background:var(--accent-soft);color:var(--fg);font-weight:600}
+.seg input:focus-visible+span{outline:2px solid var(--accent)}
+.pre{font:12px/1.5 var(--f-mono);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;max-height:260px;overflow:auto;white-space:pre;color:var(--mute)}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th,.tbl td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+.tbl th{font:600 11.5px var(--f-display);letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+.tbl td.n{font-family:var(--f-mono);text-align:right;font-variant-numeric:tabular-nums}
+.tbl .mono{font:12px var(--f-mono);word-break:break-all}
+.scroll{overflow:auto;max-height:300px;border:1px solid var(--line);border-radius:8px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.stat{border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--raise)}
+.stat small{display:block;color:var(--mute);font-size:12px}
+.stat b{font:700 26px/1.1 var(--f-display);font-variant-numeric:tabular-nums}
+.bar{display:grid;grid-template-columns:minmax(0,1fr) 2fr 56px;gap:10px;align-items:center;font-size:13px}
+.bar i{display:block;height:8px;border-radius:4px;background:var(--accent)}
+.bar span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar span:last-child{font:12px var(--f-mono);text-align:right;color:var(--mute)}
+video{width:100%;max-height:52vh;background:#000;border-radius:8px}
+.toasts{position:fixed;z-index:80;right:max(16px,env(safe-area-inset-right,0px));bottom:max(16px,env(safe-area-inset-bottom,0px));display:grid;gap:8px;justify-items:end;pointer-events:none}
+.toast{background:var(--fg);color:var(--bg);padding:9px 14px;border-radius:8px;box-shadow:var(--shadow);font-size:13px;max-width:min(420px,calc(100vw - 32px));animation:tin .18s ease-out}
+.toast.err{background:var(--live);color:#fff}
+@keyframes tin{from{transform:translateY(8px);opacity:0}}
+
+.only-n{display:none}
+@media (max-width:1180px){
+  .main{grid-template-columns:240px minmax(0,1fr)}
+  .inspane{position:fixed;z-index:50;top:max(12px,env(safe-area-inset-top,0px));bottom:max(12px,env(safe-area-inset-bottom,0px));right:max(12px,env(safe-area-inset-right,0px));width:min(380px,calc(100vw - 24px));box-shadow:var(--shadow);transform:translateX(calc(100% + 24px));transition:transform .2s}
+  .inspane.open{transform:none}
+  .only-n{display:inline-flex}
+}
+@media (max-width:760px){
+  .main{grid-template-columns:minmax(0,1fr)}
+  .gpane{position:fixed;z-index:50;top:max(12px,env(safe-area-inset-top,0px));bottom:max(12px,env(safe-area-inset-bottom,0px));left:max(12px,env(safe-area-inset-left,0px));width:min(300px,calc(100vw - 24px));box-shadow:var(--shadow);transform:translateX(calc(-100% - 24px));transition:transform .2s}
+  .gpane.open{transform:none}
+  .only-s{display:inline-flex!important}
+  .hide-s{display:none!important}
+  .pname{flex-basis:100%;order:5}
+  .two,.three{grid-template-columns:1fr}
+}
+.only-s{display:none}
+</style>
+
+<div class="app" id="app">
+  <header class="top">
+    <div class="brand">
+      <div class="mark" aria-hidden="true"><i style="background:#c0c0c0"></i><i style="background:#c0c000"></i><i style="background:#00c0c0"></i><i style="background:#00c000"></i><i style="background:#c000c0"></i><i style="background:#c00000"></i><i style="background:#0000c0"></i></div>
+      <h1>Atelier <span>M3U</span></h1>
+    </div>
+    <input class="pname" id="pname" value="Ma playlist" aria-label="Nom de la playlist" spellcheck="false">
+    <div class="spacer"></div>
+    <button class="btn icon only-s" id="bGroups" title="Groupes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg></button>
+    <button class="btn icon" id="bUndo" title="Annuler (Ctrl+Z)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg></button>
+    <button class="btn icon" id="bRedo" title="Rétablir (Ctrl+Maj+Z)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 14 5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/></svg></button>
+    <div class="wrapm">
+      <button class="btn" id="bTools" aria-haspopup="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg><span class="hide-s">Outils</span></button>
+      <div class="menu" id="mTools" hidden>
+        <button data-tool="replace">Rechercher et remplacer<small>Ctrl+H</small></button>
+        <button data-tool="clean">Nettoyer les noms</button>
+        <button data-tool="dups">Doublons</button>
+        <button data-tool="sort">Trier</button>
+        <button data-tool="number">Numéroter les chaînes</button>
+        <button data-tool="regroup">Regrouper automatiquement</button>
+        <hr>
+        <button data-tool="epg">Guide EPG (XMLTV)</button>
+        <button data-tool="xtream">Xtream Codes</button>
+        <button data-tool="props">Propriétés de la playlist</button>
+        <hr>
+        <button data-tool="stats">Statistiques</button>
+        <button data-tool="new">Nouvelle playlist vide</button>
+      </div>
+    </div>
+    <button class="btn" id="bImport"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0-4-4m4 4 4-4"/><path d="M4 17v3h16v-3"/></svg>Importer</button>
+    <button class="btn pri" id="bExport"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15V3m0 0L8 7m4-4 4 4"/><path d="M4 17v3h16v-3"/></svg>Exporter</button>
+  </header>
+
+  <main class="main">
+    <aside class="pane gpane" id="gpane">
+      <div class="ph"><h2>Groupes</h2><div class="spacer"></div>
+        <button class="ib" id="bAddGroup" title="Nouveau groupe"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></button>
+        <button class="ib only-s" id="bCloseG" title="Fermer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+      </div>
+      <div class="groups" id="groups"></div>
+    </aside>
+
+    <section class="pane" id="lpane">
+      <div class="lbar">
+        <div class="search" id="searchBox">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input id="q" placeholder="Rechercher une chaîne, une URL, un tvg-id…  ( / )" spellcheck="false" autocomplete="off">
+          <select id="qf" aria-label="Champ recherché">
+            <option value="all">Tout</option><option value="name">Nom</option><option value="url">URL</option><option value="tvg-id">tvg-id</option><option value="group-title">Groupe</option><option value="tvg-logo">Logo</option>
+          </select>
+          <button class="tog" id="qrx" title="Expression régulière">.*</button>
+        </div>
+        <select class="sel" id="fs" aria-label="État">
+          <option value="all">Tous les états</option><option value="on">Actives</option><option value="off">Désactivées</option><option value="nologo">Sans logo</option><option value="noid">Sans tvg-id</option><option value="nogroup">Sans groupe</option><option value="badurl">URL vide ou invalide</option><option value="dupurl">URL en double</option><option value="dupname">Nom en double</option>
+        </select>
+        <button class="btn" id="bAdd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg><span class="hide-s">Chaîne</span></button>
+      </div>
+      <div class="ttabs" id="ttabs" role="tablist" aria-label="Type de contenu"></div>
+      <div class="listwrap" id="listwrap">
+        <div class="lhead"><input type="checkbox" id="selAll" aria-label="Tout sélectionner"><span class="c-num" style="text-align:right">#</span><span class="c-logo hide-xs"></span><span>Chaîne</span><span class="c-grp">Groupe</span><span class="c-url">Flux</span><span></span></div>
+        <div class="list" id="list" tabindex="0"><div class="spc" id="spc"><div class="rows" id="rows"></div></div></div>
+        <div class="empty" id="empty" hidden>
+          <div><h3>Aucune chaîne ici</h3><p id="emptyMsg">Importez un fichier M3U, collez une playlist ou ajoutez une chaîne à la main.</p>
+          <button class="btn pri" data-act="import">Importer une playlist</button></div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="pane inspane" id="inspane">
+      <div class="ph"><h2 id="ititle">Inspecteur</h2><div class="spacer"></div>
+        <button class="ib only-n" id="bCloseI" title="Fermer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+      </div>
+      <div class="insp" id="insp"></div>
+    </aside>
+  </main>
+
+  <footer class="status" id="status"></footer>
+</div>
+<div class="toasts" id="toasts"></div>
+<input type="file" id="fileIn" accept=".m3u,.m3u8,.txt,.json,audio/x-mpegurl,application/vnd.apple.mpegurl" multiple hidden>
+
+<script>
+"use strict";
+/* ============ Utilitaires ============ */
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fold=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+const coll=new Intl.Collator('fr',{numeric:true,sensitivity:'base'});
+const fmt=n=>n.toLocaleString('fr-FR');
+const rxEsc=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+const debounce=(f,ms)=>{let t;return(...a)=>{clearTimeout(t);t=setTimeout(()=>f(...a),ms)}};
+let UID=1;
+const pad2=n=>String(n).padStart(2,'0');
+const ICON={
+  play:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>',
+  eye:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+  eyeoff:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.1M6.6 6.6C3.8 8.4 2 12 2 12s3.5 7 10 7a9.6 9.6 0 0 0 5.4-1.6"/></svg>',
+  dots:'<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>',
+  x:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+  copy:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg>',
+};
+
+/* ============ État ============ */
+const S={name:'Ma playlist',header:{},chans:[],order:[],hidden:new Set(),keep:new Set(),
+  sel:new Set(),cur:null,anchor:null,view:[],pos:new Map(),counts:new Map(),
+  f:{g:'*',q:'',rx:false,field:'all',type:'all',state:'all'},sample:false,editing:false,vm:'list',vmAuto:true,tcounts:{},gtypes:new Map()};
+const grp=c=>c.attrs['group-title']||'';
+const setGrp=(c,g)=>{if(g)c.attrs['group-title']=g;else delete c.attrs['group-title']};
+const byId=id=>S.chans.find(c=>c.id===id);
+function ctype(c){
+  const u=(c.url||'').toLowerCase();
+  if(/\/series\//.test(u))return 'serie';
+  if(/\bS\d{1,2}\s?E\d{1,3}\b/i.test(c.name||''))return 'serie';
+  if(/\/movie\//.test(u)||/\.(mp4|mkv|avi|mov|wmv|flv)(\?|$)/.test(u))return 'film';
+  if(/\.(mp3|aac|ogg|opus|flac|m4a)(\?|$)/.test(u)||/radio/i.test(grp(c)))return 'radio';
+  return 'live';
+}
+const TYPELABEL={live:'DIRECT',film:'FILM',serie:'SÉRIE',radio:'RADIO'};
+const initials=n=>{const w=String(n||'?').replace(/^[A-Z]{2,3}\s*[:|]\s*/,'').replace(/[^\p{L}\p{N} ]/gu,' ').trim().split(/\s+/);return((w[0]||'?')[0]+(w[1]?w[1][0]:(w[0]||'')[1]||'')).toUpperCase()};
+
+/* ============ Analyse M3U ============ */
+function normKey(k){return /^(tvg-|group-|catchup|timeshift|tvg_)/i.test(k)?k.toLowerCase():k}
+function parseAttrs(s){
+  const o={};const re=/([A-Za-z0-9_:.\-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"',]+))/g;let m;
+  while((m=re.exec(s)))o[normKey(m[1])]=m[2]??m[3]??m[4]??'';
+  return o;
+}
+function blank(){return{id:UID++,name:'',url:'',dur:'-1',attrs:{},extra:[],off:false}}
+function parseExtinf(l){
+  const s=l.replace(/^#EXTINF:/i,'');let inQ=false,cut=-1;
+  for(let i=0;i<s.length;i++){const ch=s[i];if(ch==='"')inQ=!inQ;else if(ch===','&&!inQ){cut=i;break}}
+  const meta=cut<0?s:s.slice(0,cut),name=cut<0?'':s.slice(cut+1).trim();
+  const dm=meta.match(/^\s*(-?\d+(?:\.\d+)?)/);
+  const c=blank();c.dur=dm?dm[1]:'-1';c.attrs=parseAttrs(dm?meta.slice(dm[0].length):meta);c.name=name||c.attrs['tvg-name']||'';
+  return c;
+}
+function nameFromUrl(u){try{const p=new URL(u);return decodeURIComponent(p.pathname.split('/').pop()||p.hostname)}catch{return u.slice(0,60)}}
+function parseM3U(text){
+  text=String(text).replace(/^\uFEFF/,'');
+  const t=text.trim();
+  if(t.startsWith('[')||t.startsWith('{')){try{return fromJSON(JSON.parse(t))}catch{}}
+  const lines=text.split(/\r?\n/);const out={header:{},chans:[]};let cur=null,pre=[],extgrp=null;
+  for(const raw of lines){
+    const l=raw.trim();if(!l)continue;
+    if(/^#EXTM3U/i.test(l)){Object.assign(out.header,parseAttrs(l.slice(7)));continue}
+    if(/^#EXTINF:/i.test(l)){cur=parseExtinf(l);cur.extra=pre;pre=[];continue}
+    if(/^#EXTGRP:/i.test(l)){extgrp=l.slice(8).trim();continue}
+    if(l.startsWith('#')){(cur?cur.extra:pre).push(l);continue}
+    const c=cur||Object.assign(blank(),{extra:pre});if(!cur)pre=[];
+    c.url=l;if(!c.name)c.name=nameFromUrl(l);
+    if(extgrp&&!c.attrs['group-title'])c.attrs['group-title']=extgrp;
+    out.chans.push(c);cur=null;extgrp=null;
+  }
+  return out;
+}
+function fromJSON(j){
+  const arr=Array.isArray(j)?j:(j.channels||[]);const out={header:j.header||{},chans:[]};
+  for(const o of arr){const c=blank();c.name=o.name||'';c.url=o.url||'';c.dur=String(o.duration??'-1');c.off=!!o.disabled;
+    c.attrs=Object.assign({},o.attributes||{});if(o.group)c.attrs['group-title']=o.group;c.extra=Array.isArray(o.extra)?o.extra:[];out.chans.push(c)}
+  return out;
+}
+
+/* ============ Génération ============ */
+const RANK=['tvg-id','tvg-name','tvg-logo','tvg-chno','tvg-shift','group-title','catchup','catchup-days','catchup-source','timeshift'];
+const ESSENTIAL=new Set(['tvg-id','tvg-name','tvg-logo','tvg-chno','group-title']);
+function attrStr(a,mode){
+  let ks=Object.keys(a).filter(k=>a[k]!==''&&a[k]!=null);
+  if(mode==='essential')ks=ks.filter(k=>ESSENTIAL.has(k));
+  if(mode==='none')ks=ks.filter(k=>k==='group-title');
+  ks.sort((x,y)=>{const i=RANK.indexOf(x),j=RANK.indexOf(y);return(i<0?99:i)-(j<0?99:j)});
+  return ks.map(k=>`${k}="${String(a[k]).replace(/"/g,"'")}"`).join(' ');
+}
+function entryText(c,o={}){
+  let s='#EXTINF:'+(c.dur||'-1');const as=attrStr(c.attrs,o.attrs||'all');if(as)s+=' '+as;s+=','+(c.name||'')+'\n';
+  if(o.extgrp&&grp(c))s+='#EXTGRP:'+grp(c)+'\n';
+  if(o.extra!==false)for(const x of c.extra)s+=x+'\n';
+  return s+(c.url||'')+'\n';
+}
+function exportList(o){return S.chans.filter(c=>o.all||(!c.off&&!S.hidden.has(grp(c))))}
+function toM3U(list,o){
+  let h='#EXTM3U';const ha=attrStr(S.header,'all');if(o.header!==false&&ha)h+=' '+ha;
+  return h+'\n'+list.map(c=>entryText(c,o)).join('');
+}
+function toJSON(list){return JSON.stringify({name:S.name,header:S.header,channels:list.map(c=>({name:c.name,group:grp(c),url:c.url,duration:c.dur,disabled:c.off||undefined,attributes:Object.fromEntries(Object.entries(c.attrs).filter(([k])=>k!=='group-title')),extra:c.extra.length?c.extra:undefined}))},null,2)}
+function toCSV(list){
+  const q=v=>{v=String(v??'');return /[",;\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
+  const head=['nom','groupe','url','tvg-id','tvg-name','tvg-logo','tvg-chno','active'];
+  return '\uFEFF'+head.join(';')+'\n'+list.map(c=>[c.name,grp(c),c.url,c.attrs['tvg-id'],c.attrs['tvg-name'],c.attrs['tvg-logo'],c.attrs['tvg-chno'],c.off?'non':'oui'].map(q).join(';')).join('\n');
+}
+
+/* ============ ZIP (sans compression) ============ */
+const CRC=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
+function crc32(u){let c=0xFFFFFFFF;for(let i=0;i<u.length;i++)c=CRC[(c^u[i])&255]^(c>>>8);return(c^0xFFFFFFFF)>>>0}
+function makeZip(files){
+  const enc=new TextEncoder(),parts=[],central=[];let off=0;
+  for(const f of files){
+    const name=enc.encode(f.name),data=typeof f.data==='string'?enc.encode(f.data):f.data,crc=crc32(data);
+    const h=new DataView(new ArrayBuffer(30));
+    h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(8,0,true);h.setUint16(10,0,true);h.setUint16(12,0x21,true);
+    h.setUint32(14,crc,true);h.setUint32(18,data.length,true);h.setUint32(22,data.length,true);h.setUint16(26,name.length,true);h.setUint16(28,0,true);
+    parts.push(new Uint8Array(h.buffer),name,data);
+    const c=new DataView(new ArrayBuffer(46));
+    c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);c.setUint16(10,0,true);c.setUint16(12,0,true);c.setUint16(14,0x21,true);
+    c.setUint32(16,crc,true);c.setUint32(20,data.length,true);c.setUint32(24,data.length,true);c.setUint16(28,name.length,true);c.setUint32(42,off,true);
+    central.push(new Uint8Array(c.buffer),name);off+=30+name.length+data.length;
+  }
+  const cs=central.reduce((s,p)=>s+p.length,0),e=new DataView(new ArrayBuffer(22));
+  e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,cs,true);e.setUint32(16,off,true);
+  return new Blob([...parts,...central,new Uint8Array(e.buffer)],{type:'application/zip'});
+}
+const safeName=s=>(String(s||'playlist').replace(/[\\/:*?"<>|]+/g,'-').replace(/\s+/g,' ').trim()||'playlist').slice(0,80);
+const inClaude=()=>!!(window.claude&&typeof window.claude.use==='function');
+async function saveFile(filename,data){
+  if(!inClaude()){
+    const blob=data instanceof Blob?data:new Blob([data],{type:'text/plain;charset=utf-8'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;document.body.append(a);a.click();
+    setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);toast('Fichier enregistré : '+filename);return;
+  }
+  let dl=null;try{dl=await window.claude.use('downloads')}catch{}
+  if(!dl){toast('L’enregistrement de fichiers n’est pas disponible dans cette vue. Utilisez « Copier ».','err');return}
+  if(/\.m3u8?$/i.test(filename)){data=makeZip([{name:filename,data}]);filename=filename.replace(/\.m3u8?$/i,'')+'.zip'}
+  try{await dl.save({filename,data});toast('Fichier proposé : '+filename)}
+  catch(e){const c=e&&e.code;
+    if(c==='declined')toast('Enregistrement annulé');
+    else if(c==='rate_limited')toast('Une fenêtre d’enregistrement est déjà ouverte.');
+    else toast('Enregistrement impossible ('+(c||'erreur')+'). Utilisez « Copier ».','err')}
+}
+async function copyText(t,label){
+  try{await navigator.clipboard.writeText(t);toast((label||'Texte')+' copié')}
+  catch{const ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';document.body.append(ta);ta.select();
+    let ok=false;try{ok=document.execCommand('copy')}catch{}ta.remove();toast(ok?(label||'Texte')+' copié':'Copie refusée par le navigateur : sélectionnez le texte à la main.',ok?'':'err')}
+}
+
+/* ============ Historique ============ */
+const UNDO=[],REDO=[];let undoSize=0;
+const snap=()=>JSON.stringify({h:S.header,c:S.chans,o:S.order,x:[...S.hidden],k:[...S.keep]});
+function restore(str){const d=JSON.parse(str);S.header=d.h;S.chans=d.c;S.order=d.o;S.hidden=new Set(d.x);S.keep=new Set(d.k||[]);
+  for(const c of S.chans)if(c.id>=UID)UID=c.id+1;
+  S.sel=new Set([...S.sel].filter(id=>S.chans.some(c=>c.id===id)));if(S.cur&&!byId(S.cur))S.cur=null}
+function pushUndo(){const s=snap();UNDO.push(s);undoSize+=s.length;REDO.length=0;
+  while(UNDO.length>80||(undoSize>60e6&&UNDO.length>1))undoSize-=UNDO.shift().length;S.sample=false;updUndo()}
+function undo(){if(!UNDO.length)return;const s=UNDO.pop();undoSize-=s.length;REDO.push(snap());restore(s);refresh(true);toast('Annulé')}
+function redo(){if(!REDO.length)return;UNDO.push(snap());restore(REDO.pop());refresh(true);toast('Rétabli')}
+function updUndo(){$('#bUndo').disabled=!UNDO.length;$('#bRedo').disabled=!REDO.length}
+function mutate(fn,msg){pushUndo();fn();refresh(true);if(msg)toast(msg)}
+
+/* ============ Sauvegarde locale ============ */
+const LS='atelier-m3u:v1';
+const autosave=debounce(()=>{try{localStorage.setItem(LS,JSON.stringify({name:S.name,s:snap(),sample:S.sample}))}catch{}},700);
+function loadSaved(){try{const d=JSON.parse(localStorage.getItem(LS)||'null');if(d&&d.s){restore(d.s);S.name=d.name||S.name;S.sample=!!d.sample;return true}}catch{}return false}
+
+/* ============ Groupes ============ */
+function syncGroups(){
+  const counts=new Map();for(const c of S.chans){const g=grp(c);counts.set(g,(counts.get(g)||0)+1)}
+  S.order=S.order.filter(g=>counts.has(g)||S.keep.has(g));const have=new Set(S.order);
+  for(const g of counts.keys())if(!have.has(g)){S.order.push(g);have.add(g)}
+  for(const g of [...S.keep])if(counts.has(g))S.keep.delete(g);
+  for(const g of [...S.hidden])if(!have.has(g))S.hidden.delete(g);
+  S.counts=counts;if(S.f.g!=='*'&&!have.has(S.f.g))S.f.g='*';
+}
+function clusterByGroups(){const idx=new Map(S.order.map((g,i)=>[g,i]));S.chans.sort((a,b)=>idx.get(grp(a))-idx.get(grp(b)))}
+const gLabel=g=>g||'Sans groupe';
+
+/* ============ Filtrage ============ */
+function dupSets(){
+  const u=new Map(),n=new Map();
+  for(const c of S.chans){const ku=(c.url||'').trim();if(ku)u.set(ku,(u.get(ku)||0)+1);const kn=normName(c.name);if(kn)n.set(kn,(n.get(kn)||0)+1)}
+  return{u,n};
+}
+function normName(s){return fold(cleanName(s,{prefix:true,quality:true,brackets:true,symbols:true})).replace(/[^a-z0-9]+/g,'')}
+const validUrl=u=>/^(https?|rtmp|rtmps|rtsp|rtp|udp|mms|srt|file|acestream|plugin):\/\/\S+/i.test(u||'');
+function computeView(){
+  const f=S.f;let test=null;$('#searchBox').classList.remove('bad');
+  if(f.q.trim()){
+    if(f.rx){try{const r=new RegExp(f.q,'i');test=s=>r.test(s)}catch{$('#searchBox').classList.add('bad')}}
+    else{const words=fold(f.q).split(/\s+/).filter(Boolean);test=s=>{const h=fold(s);return words.every(w=>h.includes(w))}}
+  }
+  let d=null;if(f.state==='dupurl'||f.state==='dupname')d=dupSets();
+  S.pos=new Map();const tc={all:0,live:0,film:0,serie:0,radio:0},gt=new Map();
+  S.chans.forEach((c,i)=>{S.pos.set(c.id,i);const t=ctype(c),g=grp(c);let o=gt.get(g);if(!o){o={live:0,film:0,serie:0,radio:0};gt.set(g,o)}o[t]++;if(f.g==='*'||g===f.g){tc.all++;tc[t]++}});
+  S.tcounts=tc;S.gtypes=gt;
+  S.view=S.chans.filter(c=>{
+    if(f.g!=='*'&&grp(c)!==f.g)return false;
+    if(f.type!=='all'&&ctype(c)!==f.type)return false;
+    switch(f.state){
+      case 'on':if(c.off||S.hidden.has(grp(c)))return false;break;
+      case 'off':if(!c.off&&!S.hidden.has(grp(c)))return false;break;
+      case 'nologo':if(c.attrs['tvg-logo'])return false;break;
+      case 'noid':if(c.attrs['tvg-id'])return false;break;
+      case 'nogroup':if(grp(c))return false;break;
+      case 'badurl':if(validUrl(c.url))return false;break;
+      case 'dupurl':if((d.u.get((c.url||'').trim())||0)<2)return false;break;
+      case 'dupname':if((d.n.get(normName(c.name))||0)<2)return false;break;
+    }
+    if(test){const k=f.field;const h=k==='all'?c.name+' '+c.url+' '+(c.attrs['tvg-id']||'')+' '+(c.attrs['tvg-name']||'')+' '+grp(c):k==='name'?c.name:k==='url'?c.url:(c.attrs[k]||'');if(!test(h))return false}
+    return true;
+  });
+  renderTypes();
+}
+const VM_ICON={list:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>',grid:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="9" rx="1"/><rect x="3" y="15" width="7" height="6" rx="1"/><rect x="14" y="15" width="7" height="6" rx="1"/></svg>'};
+function renderTypes(){
+  const t=S.tcounts||{};const tab=(k,l)=>`<button role="tab" data-t="${k}" class="${S.f.type===k?'on':''}" aria-selected="${S.f.type===k}">${l}<small>${fmt(t[k]||0)}</small></button>`;
+  $('#ttabs').innerHTML=tab('all','Tout')+tab('live','Direct')+tab('film','Films')+tab('serie','Séries')+(t.radio||S.f.type==='radio'?tab('radio','Radio'):'')+
+    `<div class="vm"><button data-vm="list" class="${S.vm!=='grid'?'on':''}" title="Vue en liste" aria-label="Vue en liste">${VM_ICON.list}</button><button data-vm="grid" class="${S.vm==='grid'?'on':''}" title="Vue en affiches" aria-label="Vue en affiches">${VM_ICON.grid}</button></div>`;
+}
+
+/* ============ Rendu ============ */
+function refresh(full){syncGroups();computeView();renderSide();renderList();if(full!==false)renderInsp();renderStatus();updUndo();autosave()}
+const softRefresh=debounce(()=>{syncGroups();computeView();renderSide();renderList();renderStatus();autosave();updRaw()},120);
+
+const SECT={live:'Direct',film:'Films',serie:'Séries',radio:'Radio'};
+function gtype(g){const o=S.gtypes.get(g);if(!o)return 'live';let best='live',n=-1;for(const k of ['live','film','serie','radio'])if(o[k]>n){n=o[k];best=k}return best}
+function renderSide(){
+  const ft=S.f.type,tot=ft==='all'?S.chans.length:(S.tcounts[ft]??0);
+  const gs=S.order.filter(g=>ft==='all'||(S.gtypes.get(g)?.[ft]||0)>0||(!S.counts.get(g)&&S.keep.has(g)));
+  let h=`<div class="g all${S.f.g==='*'?' on':''}" data-g="*"><span></span><span class="gn">${ft==='all'?'Toutes les chaînes':'Tous les groupes'}</span><span class="gc">${fmt(tot)}</span></div>`;
+  const by={live:[],film:[],serie:[],radio:[]};for(const g of gs)by[gtype(g)].push(g);
+  const multi=Object.values(by).filter(a=>a.length).length>1;
+  const item=g=>{const off=S.hidden.has(g),n=ft==='all'?(S.counts.get(g)||0):(S.gtypes.get(g)?.[ft]||0);
+    return `<div class="g${S.f.g===g?' on':''}${off?' off':''}" data-g="${esc(g)}" draggable="true" title="${esc(gLabel(g))}"><span class="grip">⋮⋮</span><span class="gn">${esc(gLabel(g))}</span><span class="gc">${fmt(n)}</span><button class="ib" data-gact="menu" title="Actions du groupe">${ICON.dots}</button></div>`};
+  if(multi){for(const k of ['live','film','serie','radio'])if(by[k].length)h+=`<div class="gsep">${SECT[k]} · ${fmt(by[k].length)} groupe${by[k].length>1?'s':''}</div>`+by[k].map(item).join('')}
+  else h+=`<div class="gsep">${fmt(gs.length)} groupe${gs.length>1?'s':''}</div>`+gs.map(item).join('');
+  $('#groups').innerHTML=h;
+}
+const ROW=48;const badLogo=new Set();
+function rowHTML(c){
+  const s=S.sel.has(c.id),t=ctype(c),logo=c.attrs['tvg-logo'],off=c.off||S.hidden.has(grp(c));
+  const num=c.attrs['tvg-chno']||(S.pos.get(c.id)+1);
+  return `<div class="row${s?' s':''}${S.cur===c.id?' cur':''}${off?' x':''}" data-id="${c.id}" draggable="true">
+<input type="checkbox" data-r="chk"${s?' checked':''} aria-label="Sélectionner ${esc(c.name)}"><span class="num c-num">${esc(num)}</span>
+<span class="logo"><b>${esc(initials(c.name))}</b>${logo&&!badLogo.has(logo)?`<img src="${esc(logo)}" alt="" loading="lazy" referrerpolicy="no-referrer">`:''}</span>
+<span class="nm"><span class="t">${esc(c.name||'(sans nom)')}</span><span class="u"><span class="pill p-${t}">${TYPELABEL[t]}</span>${esc(vodSub(c)||c.attrs['tvg-id']||grp(c)||'—')}</span></span>
+<span class="cg c-grp">${esc(gLabel(grp(c)))}</span><span class="cu c-url" title="${esc(c.url)}">${esc(c.url||'URL manquante')}</span>
+<span class="ra"><button class="ib play" data-r="play" title="Lire le flux">${ICON.play}</button><button class="ib" data-r="toggle" title="${off?'Activer':'Désactiver'}">${off?ICON.eyeoff:ICON.eye}</button></span></div>`;
+}
+function vodSub(c){const m=c.meta||{},t=ctype(c);if(t==='serie'&&m.season)return `S${pad2(m.season)} E${pad2(m.episode||0)}${m.title?' · '+m.title:''}`;
+  if(t==='film'){const y=m.year||(/\((\d{4})\)/.exec(c.name)||[])[1]||'';return [y,m.rating?'★ '+m.rating:''].filter(Boolean).join(' · ')}return ''}
+function cardHTML(c){
+  const s=S.sel.has(c.id),t=ctype(c),logo=c.attrs['tvg-logo'],off=c.off||S.hidden.has(grp(c)),m=c.meta||{};
+  const year=m.year||(/\((\d{4})\)/.exec(c.name)||[])[1]||'';
+  const sub=t==='serie'&&m.season?`S${pad2(m.season)} E${pad2(m.episode||0)}${m.title?' · '+m.title:''}`:[year,gLabel(grp(c))].filter(Boolean).join(' · ');
+  return `<div class="card${s?' s':''}${S.cur===c.id?' cur':''}${off?' x':''}" data-id="${c.id}"><div class="poster"><b>${esc(initials(c.name))}</b>${logo&&!badLogo.has(logo)?`<img src="${esc(logo)}" alt="" loading="lazy" referrerpolicy="no-referrer">`:''}<span class="pill p-${t}">${TYPELABEL[t]}</span>${m.rating?`<span class="rt">★ ${esc(m.rating)}</span>`:''}<input type="checkbox" data-r="chk"${s?' checked':''} aria-label="Sélectionner ${esc(c.name)}"></div><div><div class="ct" title="${esc(c.name)}">${esc(c.name||'(sans nom)')}</div><div class="cs">${esc(sub)}</div></div></div>`;
+}
+let GEO={cols:1,rh:ROW};
+function renderList(){
+  const box=$('#list'),n=S.view.length,rows=$('#rows'),grid=S.vm==='grid';
+  $('#listwrap').classList.toggle('grid',grid);rows.classList.toggle('grid',grid);
+  const top=box.scrollTop,h=box.clientHeight||600;let html='',a,b;
+  if(grid){const W=Math.max(200,box.clientWidth-24),min=W<520?118:150,cols=Math.max(2,Math.floor((W+12)/(min+12))),cw=(W-(cols-1)*12)/cols,rh=Math.round((cw-12)*1.5+96)+12;
+    GEO={cols,rh};const nr=Math.ceil(n/cols);$('#spc').style.height=(nr*rh+24)+'px';
+    a=Math.max(0,Math.floor(top/rh)-2);b=Math.min(nr,Math.ceil((top+h)/rh)+2);
+    for(let i=a*cols;i<Math.min(n,b*cols);i++)html+=cardHTML(S.view[i]);
+    rows.style.gridTemplateColumns=`repeat(${cols},minmax(0,1fr))`;rows.style.gridAutoRows=(rh-12)+'px';rows.innerHTML=html;rows.style.transform=`translateY(${a*rh}px)`;}
+  else{GEO={cols:1,rh:ROW};$('#spc').style.height=(n*ROW)+'px';a=Math.max(0,Math.floor(top/ROW)-6);b=Math.min(n,Math.ceil((top+h)/ROW)+6);
+    for(let i=a;i<b;i++)html+=rowHTML(S.view[i]);rows.style.gridTemplateColumns='';rows.style.gridAutoRows='';rows.innerHTML=html;rows.style.transform=`translateY(${a*ROW}px)`;}
+  const em=$('#empty');em.hidden=n>0;
+  if(!n)$('#emptyMsg').textContent=S.chans.length?'Aucune entrée ne correspond aux filtres. Modifiez la recherche ou choisissez « Tout ».':'Importez un fichier M3U, collez une playlist, connectez un compte Xtream ou ajoutez une chaîne à la main.';
+  const all=$('#selAll'),selInView=S.view.filter(c=>S.sel.has(c.id)).length;all.checked=n>0&&selInView===n;all.indeterminate=selInView>0&&selInView<n;
+}
+function renderStatus(){
+  const act=S.chans.filter(c=>!c.off&&!S.hidden.has(grp(c))).length;
+  $('#status').innerHTML=`<span><span class="dot"></span> <b>${fmt(S.chans.length)}</b> chaînes</span><span><b>${fmt(act)}</b> exportées</span><span><b>${fmt(S.view.length)}</b> affichées</span><span><b>${fmt(S.sel.size)}</b> sélectionnées</span><span><b>${fmt(S.order.length)}</b> groupes</span>${S.sample?'<span class="chip">Playlist d’exemple — importez la vôtre</span>':''}<span class="spacer"></span><span class="hide-s">Enregistrement automatique dans ce navigateur</span>`;
+}
+
+/* ============ Inspecteur ============ */
+const KNOWN=new Set(['tvg-id','tvg-name','tvg-logo','tvg-chno','group-title','catchup','catchup-days','catchup-source','tvg-shift']);
+function groupDatalist(){return `<datalist id="dlg">${S.order.filter(Boolean).map(g=>`<option value="${esc(g)}">`).join('')}</datalist>`}
+function fld(label,key,val,o={}){return `<div class="fld"><label for="f_${key}">${label}${o.code?`<code>${o.code}</code>`:''}</label><input class="in${o.mono?' mono':''}" id="f_${key}" data-k="${key}" value="${esc(val)}"${o.list?' list="dlg"':''} spellcheck="false" placeholder="${esc(o.ph||'')}"></div>`}
+function renderInsp(){
+  const el=$('#insp');
+  if(S.sel.size>1){renderBulk(el);return}
+  const c=S.cur&&byId(S.cur);
+  if(!c){$('#ititle').textContent='Inspecteur';
+    el.innerHTML=`<div class="ihint"><p>Sélectionnez une chaîne pour modifier son nom, son flux, son groupe et ses attributs EXTINF.</p>
+<ul><li>Cliquez pour sélectionner, <span class="kb">Maj</span> pour une plage, <span class="kb">Ctrl</span>/<span class="kb">⌘</span> pour ajouter.</li>
+<li>Glissez des lignes pour les déplacer, ou sur un groupe pour les y ranger.</li><li>Glissez les groupes pour changer leur ordre.</li>
+<li><span class="kb">/</span> recherche · <span class="kb">Suppr</span> supprime · <span class="kb">Ctrl</span>+<span class="kb">D</span> duplique · <span class="kb">Ctrl</span>+<span class="kb">Z</span> annule</li>
+<li>Déposez un fichier .m3u n’importe où pour l’importer.</li></ul></div>`;return}
+  $('#ititle').textContent='Chaîne';
+  const others=Object.keys(c.attrs).filter(k=>!KNOWN.has(k));const logo=c.attrs['tvg-logo'];
+  el.innerHTML=`${groupDatalist()}
+<div class="ihead"><span class="logo"><b>${esc(initials(c.name))}</b>${logo&&!badLogo.has(logo)?`<img src="${esc(logo)}" alt="" referrerpolicy="no-referrer">`:''}</span>
+<div style="min-width:0"><h3 id="iname">${esc(c.name||'(sans nom)')}</h3><div class="meta">Position ${S.pos.get(c.id)+1} · ${TYPELABEL[ctype(c)]}${c.meta?.season?` · S${pad2(c.meta.season)} E${pad2(c.meta.episode||0)}`:''}${c.meta?.year?' · '+esc(c.meta.year):''}${c.meta?.rating?' · ★ '+esc(c.meta.rating):''}${c.off?' · désactivée':''}</div>${c.meta?.title?`<div class="meta">${esc(c.meta.title)}</div>`:''}</div></div>
+<div class="fs">${fld('Nom affiché','name',c.name)}
+<div class="fld"><label for="f_url">URL du flux</label><div class="inrow"><input class="in mono" id="f_url" data-k="url" value="${esc(c.url)}" spellcheck="false"><button class="ib" data-i="play" title="Lire">${ICON.play}</button><button class="ib" data-i="copyurl" title="Copier l’URL">${ICON.copy}</button></div></div>
+${fld('Groupe','group-title',grp(c),{list:true,code:'group-title'})}</div>
+<div class="fs"><h4>Guide et logo</h4><div class="two">${fld('Identifiant EPG','tvg-id',c.attrs['tvg-id']||'',{mono:true,code:'tvg-id'})}${fld('Nom EPG','tvg-name',c.attrs['tvg-name']||'',{code:'tvg-name'})}</div>
+${fld('Logo','tvg-logo',logo||'',{mono:true,code:'tvg-logo',ph:'https://…/logo.png'})}
+<div class="three">${fld('Numéro','tvg-chno',c.attrs['tvg-chno']||'',{mono:true,code:'tvg-chno'})}${fld('Décalage','tvg-shift',c.attrs['tvg-shift']||'',{mono:true,code:'tvg-shift',ph:'0'})}${fld('Durée','dur',c.dur,{mono:true,code:'EXTINF'})}</div></div>
+<div class="fs"><h4>Replay</h4><div class="two">${fld('Mode','catchup',c.attrs['catchup']||'',{mono:true,code:'catchup',ph:'default, shift, flussonic…'})}${fld('Jours','catchup-days',c.attrs['catchup-days']||'',{mono:true,code:'catchup-days'})}</div>
+${fld('Source du replay','catchup-source',c.attrs['catchup-source']||'',{mono:true,code:'catchup-source',ph:'?utc={utc}&lutc={lutc}'})}</div>
+<div class="fs"><h4>Autres attributs</h4><div id="kvs" style="display:grid;gap:6px">${others.map((k,i)=>`<div class="kv"><input class="in mono" data-kvk="${i}" value="${esc(k)}" aria-label="Attribut"><input class="in mono" data-kvv="${i}" value="${esc(c.attrs[k])}" aria-label="Valeur"><button class="ib" data-kvdel="${i}" title="Retirer">${ICON.x}</button></div>`).join('')}</div>
+<div><button class="btn sm" data-i="addkv">Ajouter un attribut</button></div></div>
+<div class="fs"><h4>Lignes d’options</h4><div class="fld"><label for="f_extra">#EXTVLCOPT, #KODIPROP, #EXTHTTP… une par ligne</label><textarea class="ta" id="f_extra" data-k="extra" spellcheck="false" placeholder="#EXTVLCOPT:http-user-agent=Mozilla/5.0">${esc(c.extra.join('\n'))}</textarea></div></div>
+<div class="fs"><h4>Entrée générée</h4><div class="raw" id="raw"></div></div>
+<div class="acts"><button class="btn sm" data-i="dup">Dupliquer</button><button class="btn sm" data-i="toggle">${c.off?'Activer':'Désactiver'}</button><button class="btn sm" data-i="up">Monter</button><button class="btn sm" data-i="down">Descendre</button><button class="btn sm danger" data-i="del">Supprimer</button></div>`;
+  updRaw();
+}
+function updRaw(){const r=$('#raw');if(!r)return;const c=S.cur&&byId(S.cur);if(!c)return;
+  r.innerHTML=esc(entryText(c)).replace(/(#EXT[A-Z]+|#KODIPROP|#EXTVLCOPT)/g,'<span class="k">$1</span>');
+  const n=$('#iname');if(n)n.textContent=c.name||'(sans nom)'}
+function renderBulk(el){
+  $('#ititle').textContent='Sélection';const ids=[...S.sel];
+  el.innerHTML=`${groupDatalist()}<div><div class="big">${fmt(ids.length)}</div><div class="note">chaînes sélectionnées</div></div>
+<div class="fs"><h4>Ranger</h4><div class="fld"><label for="b_g">Déplacer vers le groupe</label><div class="inrow"><input class="in" id="b_g" list="dlg" placeholder="Nom du groupe"><button class="btn sm" data-b="group">Appliquer</button></div></div></div>
+<div class="fs"><h4>Attribut commun</h4><div class="two"><div class="fld"><label for="b_k">Attribut</label><input class="in mono" id="b_k" list="dla" placeholder="tvg-shift"><datalist id="dla">${RANK.concat(['http-user-agent','http-referrer','radio','tvg-country','tvg-language','tvg-url','timeshift','parent-code','audio-track']).map(k=>`<option value="${k}">`).join('')}</datalist></div><div class="fld"><label for="b_v">Valeur (vide = retirer)</label><input class="in mono" id="b_v"></div></div><div><button class="btn sm" data-b="attr">Appliquer à la sélection</button></div></div>
+<div class="fs"><h4>Nom</h4><div class="two"><div class="fld"><label for="b_pre">Préfixe</label><input class="in" id="b_pre"></div><div class="fld"><label for="b_suf">Suffixe</label><input class="in" id="b_suf"></div></div><div class="acts"><button class="btn sm" data-b="affix">Ajouter</button><button class="btn sm" data-b="clean">Nettoyer les noms…</button><button class="btn sm" data-b="replace">Remplacer…</button></div></div>
+<div class="fs"><h4>Actions</h4><div class="acts"><button class="btn sm" data-b="on">Activer</button><button class="btn sm" data-b="off">Désactiver</button><button class="btn sm" data-b="dup">Dupliquer</button><button class="btn sm" data-b="top">En haut</button><button class="btn sm" data-b="bottom">En bas</button><button class="btn sm" data-b="new">Nouveau groupe…</button><button class="btn sm" data-b="export">Exporter la sélection</button><button class="btn sm danger" data-b="del">Supprimer</button></div></div>
+<div><button class="btn sm ghost" data-b="none">Effacer la sélection</button></div>`;
+}
+
+/* ============ Actions sur les chaînes ============ */
+function selected(){return S.chans.filter(c=>S.sel.has(c.id))}
+function delIds(ids){const set=new Set(ids);mutate(()=>{S.chans=S.chans.filter(c=>!set.has(c.id));S.sel.clear();if(set.has(S.cur))S.cur=null},`${fmt(set.size)} chaîne${set.size>1?'s':''} supprimée${set.size>1?'s':''}`)}
+function dupIds(ids){const set=new Set(ids);mutate(()=>{const out=[];const nsel=new Set();for(const c of S.chans){out.push(c);if(set.has(c.id)){const d=JSON.parse(JSON.stringify(c));d.id=UID++;out.push(d);nsel.add(d.id)}}S.chans=out;S.sel=nsel;S.cur=nsel.size===1?[...nsel][0]:null},'Dupliqué')}
+function moveIds(ids,targetId,after){
+  const set=new Set(ids);if(set.has(targetId))return;const t=byId(targetId);if(!t)return;
+  mutate(()=>{const moving=S.chans.filter(c=>set.has(c.id));const rest=S.chans.filter(c=>!set.has(c.id));
+    const ti=rest.indexOf(t)+(after?1:0);const tg=grp(t);moving.forEach(c=>setGrp(c,tg));rest.splice(ti,0,...moving);S.chans=rest});
+}
+function moveToGroup(ids,g){
+  const set=new Set(ids);
+  mutate(()=>{const moving=S.chans.filter(c=>set.has(c.id));moving.forEach(c=>setGrp(c,g));const rest=S.chans.filter(c=>!set.has(c.id));
+    let last=-1;rest.forEach((c,i)=>{if(grp(c)===g)last=i});if(last<0){rest.push(...moving)}else rest.splice(last+1,0,...moving);S.chans=rest;
+    if(g&&!S.order.includes(g))S.order.push(g)},`${fmt(set.size)} chaîne${set.size>1?'s':''} rangée${set.size>1?'s':''} dans « ${gLabel(g)} »`);
+}
+function shiftCur(d){const c=byId(S.cur);if(!c)return;const i=S.chans.indexOf(c),j=i+d;if(j<0||j>=S.chans.length)return;
+  mutate(()=>{[S.chans[i],S.chans[j]]=[S.chans[j],S.chans[i]]})}
+function addChannel(){
+  const g=S.f.g==='*'?'':S.f.g;mutate(()=>{const c=blank();c.name='Nouvelle chaîne';c.url='http://';setGrp(c,g);
+    let last=-1;S.chans.forEach((x,i)=>{if(grp(x)===g)last=i});if(last<0)S.chans.push(c);else S.chans.splice(last+1,0,c);
+    S.sel=new Set([c.id]);S.cur=c.id;S.f.q='';$('#q').value='';S.f.state='all';$('#fs').value='all';S.f.type='all'});
+  scrollToCur();openInsp();setTimeout(()=>{const i=$('#f_name');if(i){i.focus();i.select()}},60);
+}
+function scrollToCur(){const i=S.view.findIndex(c=>c.id===S.cur);if(i<0)return;const box=$('#list');const y=Math.floor(i/GEO.cols)*GEO.rh;if(y<box.scrollTop||y>box.scrollTop+box.clientHeight-GEO.rh)box.scrollTop=y-box.clientHeight/3;renderList()}
+function openInsp(){if(matchMedia('(max-width:1180px)').matches)$('#inspane').classList.add('open')}
+
+/* ============ Événements : liste ============ */
+const list=$('#list');
+list.addEventListener('scroll',()=>requestAnimationFrame(renderList),{passive:true});
+window.addEventListener('resize',debounce(renderList,80));
+$('#rows').addEventListener('error',e=>{if(e.target.tagName==='IMG'){badLogo.add(e.target.getAttribute('src'));e.target.remove()}},true);
+$('#insp').addEventListener('error',e=>{if(e.target.tagName==='IMG'){badLogo.add(e.target.getAttribute('src'));e.target.remove()}},true);
+$('#rows').addEventListener('click',e=>{
+  const row=e.target.closest('[data-id]');if(!row)return;const id=+row.dataset.id;const r=e.target.closest('[data-r]')?.dataset.r;
+  if(r==='play'){openPlayer(byId(id));return}
+  if(r==='toggle'){const c=byId(id);mutate(()=>{if(S.hidden.has(grp(c))&&c.off===false){S.hidden.delete(grp(c))}else c.off=!c.off});return}
+  if(r==='chk'||e.ctrlKey||e.metaKey){S.sel.has(id)?S.sel.delete(id):S.sel.add(id);S.anchor=id;S.cur=S.sel.size===1?[...S.sel][0]:(S.sel.has(id)?id:S.cur);}
+  else if(e.shiftKey&&S.anchor!=null){const a=S.view.findIndex(c=>c.id===S.anchor),b=S.view.findIndex(c=>c.id===id);if(a>=0&&b>=0){const[x,y]=a<b?[a,b]:[b,a];S.sel=new Set(S.view.slice(x,y+1).map(c=>c.id))}}
+  else{S.sel=new Set([id]);S.anchor=id;S.cur=id;openInsp()}
+  renderList();renderInsp();renderStatus();
+});
+$('#rows').addEventListener('dblclick',e=>{const row=e.target.closest('[data-id]');if(!row||e.target.closest('[data-r]'))return;S.sel=new Set([+row.dataset.id]);S.cur=+row.dataset.id;renderList();renderInsp();openInsp();const i=$('#f_name');if(i){i.focus();i.select()}});
+$('#selAll').addEventListener('change',e=>{if(e.target.checked)S.view.forEach(c=>S.sel.add(c.id));else S.view.forEach(c=>S.sel.delete(c.id));if(S.sel.size===1)S.cur=[...S.sel][0];renderList();renderInsp();renderStatus()});
+let drag=null;
+$('#rows').addEventListener('dragstart',e=>{const row=e.target.closest('.row');if(!row)return;const id=+row.dataset.id;
+  if(!S.sel.has(id)){S.sel=new Set([id]);S.cur=id}drag={type:'rows',ids:[...S.sel]};e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain','m3u-rows');
+  if(S.sel.size>1){const g=document.createElement('div');g.className='toast';g.textContent=fmt(S.sel.size)+' chaînes';g.style.position='fixed';g.style.top='-100px';document.body.append(g);e.dataTransfer.setDragImage(g,10,10);setTimeout(()=>g.remove())}});
+$('#rows').addEventListener('dragover',e=>{if(!drag||drag.type!=='rows')return;const row=e.target.closest('.row');if(!row)return;e.preventDefault();
+  $$('.row.db,.row.da').forEach(r=>r.classList.remove('db','da'));const r=row.getBoundingClientRect();row.classList.add(e.clientY<r.top+r.height/2?'db':'da')});
+$('#rows').addEventListener('drop',e=>{if(!drag||drag.type!=='rows')return;const row=e.target.closest('.row');if(!row)return;e.preventDefault();
+  const after=row.classList.contains('da');moveIds(drag.ids,+row.dataset.id,after);drag=null});
+document.addEventListener('dragend',()=>{drag=null;$$('.row.db,.row.da').forEach(r=>r.classList.remove('db','da'));$$('.g.drop,.g.dropb').forEach(r=>r.classList.remove('drop','dropb'))});
+list.addEventListener('dragover',e=>{if(!drag||drag.type!=='rows')return;const r=list.getBoundingClientRect();if(e.clientY<r.top+40)list.scrollTop-=18;else if(e.clientY>r.bottom-40)list.scrollTop+=18});
+
+/* ============ Événements : groupes ============ */
+const gbox=$('#groups');
+gbox.addEventListener('click',e=>{const g=e.target.closest('.g');if(!g)return;const name=g.dataset.g;
+  if(e.target.closest('[data-gact]')){groupMenu(name,e.target.closest('[data-gact]'));return}
+  S.f.g=name;computeView();renderSide();list.scrollTop=0;renderList();renderStatus();$('#gpane').classList.remove('open')});
+gbox.addEventListener('dblclick',e=>{const g=e.target.closest('.g');if(g&&g.dataset.g!=='*'&&!e.target.closest('[data-gact]'))renameGroup(g.dataset.g)});
+gbox.addEventListener('dragstart',e=>{const g=e.target.closest('.g');if(!g||g.dataset.g==='*')return;drag={type:'group',g:g.dataset.g};e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain','m3u-group')});
+gbox.addEventListener('dragover',e=>{if(!drag)return;const g=e.target.closest('.g');if(!g||g.dataset.g==='*')return;e.preventDefault();
+  $$('.g.drop,.g.dropb').forEach(x=>x.classList.remove('drop','dropb'));g.classList.add(drag.type==='rows'?'drop':'dropb')});
+gbox.addEventListener('drop',e=>{if(!drag)return;const g=e.target.closest('.g');if(!g||g.dataset.g==='*')return;e.preventDefault();const target=g.dataset.g;
+  if(drag.type==='rows')moveToGroup(drag.ids,target);
+  else if(drag.type==='group'&&drag.g!==target){const from=drag.g;mutate(()=>{S.order=S.order.filter(x=>x!==from);S.order.splice(S.order.indexOf(target),0,from);clusterByGroups()},'Ordre des groupes modifié')}
+  drag=null});
+
+function groupMenu(g,anchor){
+  closeMenus();const m=document.createElement('div');m.className='menu';m.style.right='auto';m.style.left='0';
+  const off=S.hidden.has(g);
+  m.innerHTML=`<button data-m="rename">Renommer</button><button data-m="hide">${off?'Inclure à l’export':'Exclure de l’export'}</button><button data-m="select">Sélectionner les chaînes</button><button data-m="merge">Fusionner dans…</button><button data-m="top">Placer en premier</button><button data-m="bottom">Placer en dernier</button><button data-m="export">Exporter ce groupe</button><hr><button data-m="ungroup">Retirer le groupe des chaînes</button><button data-m="delete" style="color:var(--live)">Supprimer le groupe et ses chaînes</button>`;
+  const host=anchor.closest('.g');host.style.position='relative';host.append(m);
+  m.addEventListener('click',async ev=>{ev.stopPropagation();const a=ev.target.closest('[data-m]')?.dataset.m;if(!a)return;m.remove();
+    const ids=S.chans.filter(c=>grp(c)===g).map(c=>c.id);
+    if(a==='rename')renameGroup(g);
+    if(a==='hide')mutate(()=>{off?S.hidden.delete(g):S.hidden.add(g)},off?'Groupe inclus à l’export':'Groupe exclu de l’export');
+    if(a==='select'){S.f.g=g;S.sel=new Set(ids);S.cur=null;refresh();openInsp()}
+    if(a==='merge'){const t=await ask('Fusionner « '+gLabel(g)+' » dans',{list:true,ok:'Fusionner'});if(t!=null&&t!==g)mutate(()=>{S.chans.forEach(c=>{if(grp(c)===g)setGrp(c,t)});if(!S.order.includes(t))S.order.splice(S.order.indexOf(g),0,t);clusterByGroups()},'Groupes fusionnés')}
+    if(a==='top'||a==='bottom')mutate(()=>{S.order=S.order.filter(x=>x!==g);a==='top'?S.order.unshift(g):S.order.push(g);clusterByGroups()});
+    if(a==='export'){S.sel=new Set(ids);openExport(true)}
+    if(a==='ungroup')mutate(()=>S.chans.forEach(c=>{if(grp(c)===g)setGrp(c,'')}),'Chaînes déplacées dans « Sans groupe »');
+    if(a==='delete'){if(await confirmBox(`Supprimer le groupe « ${gLabel(g)} » et ses ${fmt(ids.length)} chaînes ?`,'Supprimer'))mutate(()=>{S.chans=S.chans.filter(c=>grp(c)!==g);S.keep.delete(g);S.sel.clear();S.cur=null},'Groupe supprimé')}
+  });
+  setTimeout(()=>document.addEventListener('click',function h(ev){if(!m.contains(ev.target)){m.remove();document.removeEventListener('click',h)}}),0);
+}
+async function renameGroup(g){const n=await ask('Renommer le groupe',{value:g,ok:'Renommer'});if(n==null||n===g)return;
+  mutate(()=>{const i=S.order.indexOf(g);S.chans.forEach(c=>{if(grp(c)===g)setGrp(c,n)});if(S.order.includes(n)){S.order.splice(i,1);clusterByGroups()}else S.order[i]=n;
+    if(S.hidden.delete(g))S.hidden.add(n);if(S.f.g===g)S.f.g=n},'Groupe renommé')}
+$('#bAddGroup').onclick=async()=>{const n=await ask('Nouveau groupe',{ok:'Créer',ph:'FR | Sport'});if(!n)return;
+  if(S.sel.size){moveToGroup([...S.sel],n)}else mutate(()=>{S.keep.add(n);if(!S.order.includes(n))S.order.push(n);S.f.g=n},'Groupe créé')};
+
+/* ============ Événements : inspecteur ============ */
+const insp=$('#insp');
+insp.addEventListener('input',e=>{
+  const t=e.target;if(S.sel.size>1)return;const c=byId(S.cur);if(!c)return;
+  if(!S.editing){pushUndo();S.editing=true}
+  const k=t.dataset.k;
+  if(k){if(k==='name')c.name=t.value;else if(k==='url')c.url=t.value.trim();else if(k==='dur')c.dur=t.value.trim()||'-1';
+    else if(k==='extra')c.extra=t.value.split('\n').map(s=>s.trim()).filter(Boolean);
+    else if(k==='group-title')setGrp(c,t.value);else{if(t.value==='')delete c.attrs[k];else c.attrs[k]=t.value}
+    softRefresh();return}
+  if(t.dataset.kvv!=null||t.dataset.kvk!=null){
+    const rows=$$('#kvs .kv');const keep=Object.fromEntries(Object.entries(c.attrs).filter(([key])=>KNOWN.has(key)));
+    for(const r of rows){const kk=r.children[0].value.trim(),vv=r.children[1].value;if(kk)keep[normKey(kk)]=vv}
+    c.attrs=keep;softRefresh();
+  }
+});
+insp.addEventListener('focusout',()=>{S.editing=false});
+insp.addEventListener('change',e=>{if(e.target.dataset.k==='tvg-logo'||e.target.dataset.k==='group-title'){S.editing=false;refresh()}});
+insp.addEventListener('click',async e=>{
+  const b=e.target.closest('[data-i],[data-b],[data-kvdel]');if(!b)return;
+  if(b.dataset.kvdel!=null){const c=byId(S.cur);const k=Object.keys(c.attrs).filter(k=>!KNOWN.has(k))[+b.dataset.kvdel];mutate(()=>{delete c.attrs[k]});return}
+  const i=b.dataset.i;const c=byId(S.cur);
+  if(i){if(i==='play')openPlayer(c);if(i==='copyurl')copyText(c.url,'URL');if(i==='dup')dupIds([c.id]);if(i==='del')delIds([c.id]);
+    if(i==='toggle')mutate(()=>{c.off=!c.off});if(i==='up')shiftCur(-1);if(i==='down')shiftCur(1);
+    if(i==='addkv'){const n=await ask('Nom de l’attribut',{ok:'Ajouter',ph:'http-user-agent'});if(n)mutate(()=>{c.attrs[normKey(n.trim())]=c.attrs[normKey(n.trim())]||''})}
+    return}
+  const a=b.dataset.b,ids=[...S.sel];
+  if(a==='group'){moveToGroup(ids,$('#b_g').value.trim())}
+  if(a==='attr'){const k=normKey($('#b_k').value.trim()),v=$('#b_v').value;if(!k){toast('Indiquez le nom de l’attribut.','err');return}
+    mutate(()=>selected().forEach(c=>{if(k==='group-title')setGrp(c,v);else if(v==='')delete c.attrs[k];else c.attrs[k]=v}),`« ${k} » appliqué à ${fmt(ids.length)} chaînes`)}
+  if(a==='affix'){const p=$('#b_pre').value,s=$('#b_suf').value;mutate(()=>selected().forEach(c=>{c.name=p+c.name+s}),'Noms modifiés')}
+  if(a==='clean')openTool('clean','sel');if(a==='replace')openTool('replace','sel');
+  if(a==='on'||a==='off')mutate(()=>selected().forEach(c=>{c.off=a==='off'}),a==='on'?'Chaînes activées':'Chaînes désactivées');
+  if(a==='dup')dupIds(ids);if(a==='del'){if(await confirmBox(`Supprimer ${fmt(ids.length)} chaînes ?`,'Supprimer'))delIds(ids)}
+  if(a==='top'||a==='bottom'){const set=new Set(ids);mutate(()=>{const m=S.chans.filter(c=>set.has(c.id)),r=S.chans.filter(c=>!set.has(c.id));S.chans=a==='top'?m.concat(r):r.concat(m)})}
+  if(a==='new'){const n=await ask('Nouveau groupe pour la sélection',{ok:'Créer',ph:'Favoris'});if(n)moveToGroup(ids,n)}
+  if(a==='export')openExport(true);
+  if(a==='none'){S.sel.clear();S.cur=null;renderList();renderInsp();renderStatus()}
+});
+
+/* ============ Barre d'outils ============ */
+$('#q').addEventListener('input',debounce(e=>{S.f.q=e.target.value;computeView();list.scrollTop=0;renderList();renderStatus()},120));
+$('#qf').onchange=e=>{S.f.field=e.target.value;computeView();renderList();renderStatus()};
+$('#qrx').onclick=e=>{S.f.rx=!S.f.rx;e.currentTarget.classList.toggle('on',S.f.rx);computeView();renderList();renderStatus()};
+$('#ttabs').addEventListener('click',e=>{const b=e.target.closest('[data-t]');if(b){S.f.type=b.dataset.t;if(S.vmAuto)S.vm=(S.f.type==='film'||S.f.type==='serie')?'grid':'list';computeView();list.scrollTop=0;renderTypes();renderList();renderStatus();return}
+  const v=e.target.closest('[data-vm]');if(v){S.vm=v.dataset.vm;S.vmAuto=false;try{localStorage.setItem(LS+':vm',S.vm)}catch{}list.scrollTop=0;renderTypes();renderList()}});
+$('#fs').onchange=e=>{S.f.state=e.target.value;computeView();list.scrollTop=0;renderList();renderStatus()};
+$('#bAdd').onclick=addChannel;
+$('#bUndo').onclick=undo;$('#bRedo').onclick=redo;
+$('#pname').addEventListener('input',e=>{S.name=e.target.value;autosave()});
+$('#bImport').onclick=()=>openImport();
+$('#bExport').onclick=()=>openExport(false);
+$('#bGroups').onclick=()=>$('#gpane').classList.toggle('open');
+$('#bCloseG').onclick=()=>$('#gpane').classList.remove('open');
+$('#bCloseI').onclick=()=>$('#inspane').classList.remove('open');
+$('#empty').addEventListener('click',e=>{if(e.target.closest('[data-act=import]'))openImport()});
+function closeMenus(){$('#mTools').hidden=true;$$('.g .menu').forEach(m=>m.remove())}
+$('#bTools').onclick=e=>{e.stopPropagation();const m=$('#mTools');const was=m.hidden;closeMenus();m.hidden=!was};
+document.addEventListener('click',e=>{if(!e.target.closest('#mTools'))$('#mTools').hidden=true});
+$('#mTools').addEventListener('click',e=>{const t=e.target.closest('[data-tool]');if(!t)return;$('#mTools').hidden=true;openTool(t.dataset.tool)});
+
+document.addEventListener('keydown',e=>{
+  const typing=/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName)||document.activeElement?.isContentEditable;
+  const mod=e.ctrlKey||e.metaKey;
+  if(e.key==='Escape'){if($('.ov')){closeModal();return}closeMenus();$('#inspane').classList.remove('open');$('#gpane').classList.remove('open');return}
+  if($('.ov'))return;
+  if(mod&&e.key.toLowerCase()==='z'&&!typing){e.preventDefault();e.shiftKey?redo():undo();return}
+  if(mod&&e.key.toLowerCase()==='y'&&!typing){e.preventDefault();redo();return}
+  if(mod&&e.key.toLowerCase()==='h'){e.preventDefault();openTool('replace');return}
+  if(mod&&e.key.toLowerCase()==='s'){e.preventDefault();openExport(false);return}
+  if(mod&&e.key.toLowerCase()==='o'){e.preventDefault();openImport();return}
+  if(typing)return;
+  if(e.key==='/'||(mod&&e.key.toLowerCase()==='f')){e.preventDefault();$('#q').focus();$('#q').select();return}
+  if(mod&&e.key.toLowerCase()==='a'){e.preventDefault();S.view.forEach(c=>S.sel.add(c.id));renderList();renderInsp();renderStatus();return}
+  if(mod&&e.key.toLowerCase()==='d'&&S.sel.size){e.preventDefault();dupIds([...S.sel]);return}
+  if((e.key==='Delete'||e.key==='Backspace')&&S.sel.size){e.preventDefault();delIds([...S.sel]);return}
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){if(!S.view.length)return;e.preventDefault();let i=S.view.findIndex(c=>c.id===S.cur);i=Math.max(0,Math.min(S.view.length-1,i+(e.key==='ArrowDown'?1:-1)));
+    const id=S.view[i].id;if(e.shiftKey)S.sel.add(id);else S.sel=new Set([id]);S.cur=id;S.anchor=id;scrollToCur();renderInsp();renderStatus()}
+});
+
+/* ============ Fenêtres ============ */
+function openModal(title,body,{wide,foot}={}){
+  closeModal();const ov=document.createElement('div');ov.className='ov';
+  ov.innerHTML=`<div class="sheet${wide?' wide':''}" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="sh"><h3>${esc(title)}</h3><button class="ib" data-close title="Fermer">${ICON.x}</button></div><div class="sb">${body}</div>${foot?`<div class="sf">${foot}</div>`:''}</div>`;
+  ov.addEventListener('mousedown',e=>{if(e.target===ov)ov._down=true});
+  ov.addEventListener('click',e=>{if((e.target===ov&&ov._down)||e.target.closest('[data-close]'))closeModal();ov._down=false});
+  document.body.append(ov);setTimeout(()=>{const f=ov.querySelector('.sb input:not([type=radio]):not([type=checkbox]),.sb textarea');f?.focus()},30);return ov.querySelector('.sheet');
+}
+function closeModal(){const ov=$('.ov');if(!ov)return;ov._onclose?.();ov.remove()}
+function ask(title,{value='',ok='Valider',ph='',list}={}){
+  return new Promise(res=>{const sh=openModal(title,`${list?groupDatalist():''}<input class="in" id="askv" value="${esc(value)}" placeholder="${esc(ph)}"${list?' list="dlg"':''}>`,{foot:`<button class="btn" data-close>Annuler</button><button class="btn pri" id="askok">${esc(ok)}</button>`});
+    let done=false;const fin=v=>{if(done)return;done=true;res(v)};sh.parentElement._onclose=()=>fin(null);
+    const go=()=>{const v=$('#askv').value.trim();fin(v);closeModal()};$('#askok').onclick=go;$('#askv').addEventListener('keydown',e=>{if(e.key==='Enter')go()});
+    setTimeout(()=>$('#askv')?.select(),40)});
+}
+function confirmBox(msg,ok='Confirmer'){
+  return new Promise(res=>{const sh=openModal('Confirmation',`<p style="margin:0">${esc(msg)}</p><p class="note" style="margin:0">Vous pourrez revenir en arrière avec Annuler (Ctrl+Z).</p>`,{foot:`<button class="btn" data-close>Retour</button><button class="btn pri" id="cfok">${esc(ok)}</button>`});
+    let done=false;sh.parentElement._onclose=()=>{if(!done){done=true;res(false)}};$('#cfok').onclick=()=>{done=true;res(true);closeModal()};$('#cfok').focus()});
+}
+let TOASTS=0;
+function toast(msg,kind){const t=document.createElement('div');t.className='toast'+(kind==='err'?' err':'');t.textContent=msg;const box=$('#toasts');box.append(t);if(box.children.length>4)box.firstChild.remove();setTimeout(()=>t.remove(),kind==='err'?6000:2600)}
+function scopeHTML(def){
+  const ns=S.sel.size,nv=S.view.length,na=S.chans.length;def=def||(ns>1?'sel':(nv<na?'view':'all'));
+  const r=(v,l,n)=>`<label><input type="radio" name="scope" value="${v}"${def===v?' checked':''}${n?'':' disabled'}><span>${l} (${fmt(n)})</span></label>`;
+  return `<div class="fld"><label>Appliquer à</label><div class="seg">${r('sel','Sélection',ns)}${r('view','Affichées',nv)}${r('all','Toutes',na)}</div></div>`;
+}
+function scopeList(root){const v=$('input[name=scope]:checked',root)?.value||'all';if(v==='sel')return selected();if(v==='view')return S.view.slice();return S.chans.slice()}
+
+/* ============ Import ============ */
+function applyImport(parsed,mode,label){
+  if(!parsed.chans.length&&!Object.keys(parsed.header).length){toast('Aucune chaîne trouvée dans '+label+'. Vérifiez qu’il s’agit bien d’une playlist M3U.','err');return false}
+  mutate(()=>{if(mode==='replace'){S.chans=[];S.order=[];S.hidden.clear();S.keep.clear();S.header={};S.sel.clear();S.cur=null;S.f.g='*'}
+    Object.assign(S.header,parsed.header);S.chans.push(...parsed.chans)});
+  S.sample=false;renderStatus();autosave();
+  toast(`${fmt(parsed.chans.length)} chaînes importées depuis ${label}`);return true;
+}
+async function readFile(f){
+  if(/\.gz$/i.test(f.name)&&'DecompressionStream' in window){return await new Response(f.stream().pipeThrough(new DecompressionStream('gzip'))).text()}
+  return await f.text();
+}
+async function importFiles(files,mode){
+  let first=true;for(const f of files){try{const txt=await readFile(f);const p=parseM3U(txt);
+    if(first&&mode==='replace'&&S.name==='Ma playlist'||first&&mode==='replace'){S.name=f.name.replace(/\.(m3u8?|txt|json|gz)+$/i,'');$('#pname').value=S.name}
+    applyImport(p,first?mode:'append',f.name);first=false}catch(e){toast('Lecture impossible de '+f.name+' : '+e.message,'err')}}
+}
+function openImport(tab='file'){
+  const sh=openModal('Importer une playlist',`<div class="tabs" id="itabs"><button data-t="file">Fichier</button><button data-t="paste">Coller</button><button data-t="url">Adresse web</button><button data-t="xtream">Xtream Codes</button></div>
+<div id="ipanel"></div>
+<div class="fld"><label>Chaînes actuelles (${fmt(S.chans.length)})</label><div class="seg"><label><input type="radio" name="imode" value="replace" ${S.sample||!S.chans.length?'checked':''}><span>Remplacer</span></label><label><input type="radio" name="imode" value="append" ${S.sample||!S.chans.length?'':'checked'}><span>Ajouter à la suite</span></label></div></div>`,{wide:true});
+  const mode=()=>$('input[name=imode]:checked',sh).value;
+  const show=t=>{$$('#itabs button',sh).forEach(b=>b.classList.toggle('on',b.dataset.t===t));const p=$('#ipanel',sh);
+    if(t==='file'){p.innerHTML=`<div class="drop" id="idrop" tabindex="0"><strong>Déposez vos fichiers ici</strong><span>ou cliquez pour choisir — .m3u, .m3u8, .txt, .json (plusieurs fichiers acceptés)</span></div>`;
+      const d=$('#idrop',p);d.onclick=()=>{pendingMode=mode();$('#fileIn').click()};d.onkeydown=e=>{if(e.key==='Enter')d.click()};
+      d.ondragover=e=>{e.preventDefault();d.classList.add('on')};d.ondragleave=()=>d.classList.remove('on');
+      d.ondrop=e=>{e.preventDefault();e.stopPropagation();d.classList.remove('on');const fs=[...e.dataTransfer.files];if(fs.length){const m=mode();closeModal();importFiles(fs,m)}}}
+    if(t==='paste'){p.innerHTML=`<textarea class="ta" id="itext" style="min-height:220px" spellcheck="false" placeholder="#EXTM3U&#10;#EXTINF:-1 tvg-id=&quot;…&quot; group-title=&quot;…&quot;,Nom de la chaîne&#10;http://…"></textarea><div style="display:flex;justify-content:flex-end"><button class="btn pri" id="igo">Importer le texte</button></div>`;
+      $('#igo',p).onclick=()=>{const v=$('#itext',p).value;if(!v.trim()){toast('Collez d’abord le contenu de la playlist.','err');return}const m=mode();if(applyImport(parseM3U(v),m,'le texte collé'))closeModal()}}
+    if(t==='url'){p.innerHTML=`<div class="fld"><label for="iurl">Adresse de la playlist</label><div class="inrow"><input class="in mono" id="iurl" placeholder="https://exemple.com/playlist.m3u" spellcheck="false"><button class="btn pri" id="igo">Charger</button></div></div>
+<p class="note">${HAS_PROXY?'Si le serveur refuse la lecture directe depuis le navigateur, l’atelier passe par son relais Cloudflare, qui ne conserve rien.':'Le serveur doit autoriser la lecture depuis un navigateur (CORS). Si le chargement échoue, téléchargez le fichier puis importez-le depuis l’onglet « Fichier ».'}</p>`;
+      $('#igo',p).onclick=async()=>{const u=$('#iurl',p).value.trim();if(!u)return;const m=mode();await importUrl(u,m)}}
+    if(t==='xtream'){p.innerHTML=xtreamForm();bindXtreamForm(p,mode)}
+  };
+  $('#itabs',sh).onclick=e=>{const b=e.target.closest('button');if(b)show(b.dataset.t)};show(tab);
+}
+let pendingMode='replace';
+$('#fileIn').addEventListener('change',e=>{const fs=[...e.target.files];e.target.value='';if(fs.length){closeModal();importFiles(fs,pendingMode)}});
+/* Lecture réseau : directe, puis via le relais Cloudflare (/api/fetch) si le serveur bloque le navigateur (CORS, http sur https). */
+const HAS_PROXY=!inClaude()&&/^https?:$/.test(location.protocol);
+async function decodeBody(r,u){
+  const ct=(r.headers.get('content-type')||'').toLowerCase();const buf=new Uint8Array(await r.arrayBuffer());
+  if(buf[0]===0x1f&&buf[1]===0x8b&&'DecompressionStream' in window)return await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+  return new TextDecoder(/charset=([\w-]+)/.exec(ct)?.[1]||'utf-8').decode(buf);
+}
+async function getText(u,{signal}={}){
+  let first;
+  try{const r=await fetch(u,{signal});if(!r.ok)throw new Error('réponse HTTP '+r.status);return await decodeBody(r,u)}
+  catch(e){if(e.name==='AbortError')throw e;first=e}
+  if(!HAS_PROXY)throw first;
+  const r=await fetch('/api/fetch?url='+encodeURIComponent(u),{headers:{'x-atelier':'1'},signal});
+  if(!r.ok){let m='';try{m=(await r.json()).error}catch{}throw new Error(m||('relais : HTTP '+r.status))}
+  return await decodeBody(r,u);
+}
+async function getJSON(u,o){const t=await getText(u,o);try{return JSON.parse(t)}catch{throw new Error('réponse illisible du serveur (JSON attendu)')}}
+async function importUrl(u,m){
+  toast('Chargement…');
+  try{const txt=await getText(u);
+    if(applyImport(parseM3U(txt),m,new URL(u).hostname)){closeModal();try{const n=new URL(u).pathname.split('/').pop();if(m==='replace'&&n){S.name=n.replace(/\.(m3u8?|php)$/i,'');$('#pname').value=S.name}}catch{}}}
+  catch(e){toast('Chargement impossible ('+(e.message||'connexion refusée')+'). Le serveur bloque sans doute la lecture depuis un navigateur : téléchargez le fichier puis importez-le.','err')}
+}
+// Dépôt global
+let dragDepth=0;
+document.addEventListener('dragenter',e=>{if(drag||!e.dataTransfer.types.includes('Files')||$('.ov'))return;dragDepth++;document.body.classList.add('dropzone-on')});
+document.addEventListener('dragleave',e=>{if(drag||!e.dataTransfer.types.includes('Files'))return;dragDepth=Math.max(0,dragDepth-1);if(!dragDepth)document.body.classList.remove('dropzone-on')});
+document.addEventListener('dragover',e=>{if(!drag&&e.dataTransfer.types.includes('Files'))e.preventDefault()});
+document.addEventListener('drop',e=>{if(drag||!e.dataTransfer.types.includes('Files'))return;e.preventDefault();dragDepth=0;document.body.classList.remove('dropzone-on');if($('.ov'))return;
+  const fs=[...e.dataTransfer.files];if(fs.length)importFiles(fs,S.sample||!S.chans.length?'replace':'append')});
+document.addEventListener('paste',e=>{if(/^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName)||$('.ov'))return;const t=e.clipboardData?.getData('text')||'';
+  if(/#EXTM3U|#EXTINF/i.test(t)){e.preventDefault();applyImport(parseM3U(t),S.sample||!S.chans.length?'replace':'append','le presse-papiers')}});
+
+/* ============ Export ============ */
+function openExport(onlySel){
+  const nsel=S.sel.size;
+  const sh=openModal('Exporter',`<div class="two"><div class="fld"><label for="xn">Nom du fichier</label><input class="in" id="xn" value="${esc(safeName(S.name))}"></div>
+<div class="fld"><label>Format</label><div class="seg" id="xfmt"><label><input type="radio" name="xf" value="m3u" checked><span>M3U</span></label><label><input type="radio" name="xf" value="m3u8"><span>M3U8</span></label><label><input type="radio" name="xf" value="json"><span>JSON</span></label><label><input type="radio" name="xf" value="csv"><span>CSV</span></label><label><input type="radio" name="xf" value="txt"><span>Liste d’URL</span></label></div></div></div>
+<div class="two"><div class="fld"><label>Chaînes</label><div class="seg"><label><input type="radio" name="xs" value="active" ${onlySel&&nsel?'':'checked'}><span>Actives</span></label><label><input type="radio" name="xs" value="all"><span>Toutes</span></label><label><input type="radio" name="xs" value="sel" ${onlySel&&nsel?'checked':''} ${nsel?'':'disabled'}><span>Sélection (${fmt(nsel)})</span></label><label><input type="radio" name="xs" value="view"><span>Affichées</span></label></div></div>
+<div class="fld"><label>Attributs</label><div class="seg"><label><input type="radio" name="xa" value="all" checked><span>Tous</span></label><label><input type="radio" name="xa" value="essential"><span>Essentiels</span></label><label><input type="radio" name="xa" value="none"><span>Groupe seul</span></label></div></div></div>
+<div class="opts"><label class="chk"><input type="checkbox" id="xhdr" checked><span>En-tête #EXTM3U avec le guide EPG (${esc(S.header['url-tvg']||S.header['x-tvg-url']||'aucun guide défini')})</span></label>
+<label class="chk"><input type="checkbox" id="xextra" checked><span>Garder les lignes d’options (#EXTVLCOPT, #KODIPROP…)</span></label>
+<label class="chk"><input type="checkbox" id="xgrp"><span>Ajouter #EXTGRP sous chaque entrée (lecteurs anciens)</span></label>
+</div><div class="fld"><label>Découpage</label><div class="seg"><label><input type="radio" name="xsp" value="" checked><span>Un seul fichier</span></label><label><input type="radio" name="xsp" value="type"><span>Direct / Films / Séries (.zip)</span></label><label><input type="radio" name="xsp" value="group"><span>Un fichier par groupe (.zip)</span></label></div></div>
+<div class="fld"><label>Aperçu <span id="xcount"></span></label><div class="pre" id="xprev"></div></div>
+${inClaude()?'<p class="note">Dans Claude, les fichiers .m3u sont livrés dans une archive .zip, à décompresser avant usage. « Copier » donne le texte brut.</p>':''}`,
+  {wide:true,foot:`<button class="btn" id="xcopy">${ICON.copy} Copier</button><button class="btn pri" id="xsave">Télécharger</button>`});
+  const opts=()=>({fmt:$('input[name=xf]:checked',sh).value,scope:$('input[name=xs]:checked',sh).value,attrs:$('input[name=xa]:checked',sh).value,header:$('#xhdr',sh).checked,extra:$('#xextra',sh).checked,extgrp:$('#xgrp',sh).checked,split:$('input[name=xsp]:checked',sh).value});
+  const pick=o=>{if(o.scope==='sel')return selected();if(o.scope==='view')return S.view.slice();return exportList({all:o.scope==='all'})};
+  const build=(o,l)=>o.fmt==='json'?toJSON(l):o.fmt==='csv'?toCSV(l):o.fmt==='txt'?l.map(c=>c.url).join('\n')+'\n':toM3U(l,o);
+  const prev=()=>{const o=opts(),l=pick(o);const t=build(o,l.slice(0,60));$('#xprev',sh).textContent=t.split('\n').slice(0,120).join('\n')+(l.length>60?'\n…':'');
+    $('#xcount',sh).textContent=`— ${fmt(l.length)} chaînes`;};
+  sh.addEventListener('change',prev);prev();
+  $('#xcopy',sh).onclick=()=>{const o=opts();copyText(build(o,pick(o)),'Playlist')};
+  $('#xsave',sh).onclick=async()=>{const o=opts(),l=pick(o);if(!l.length){toast('Aucune chaîne à exporter avec ces réglages.','err');return}
+    const base=safeName($('#xn',sh).value);const ext=o.fmt==='txt'?'txt':o.fmt;
+    if(o.split){const by=new Map(),TN={live:'Direct',film:'Films',serie:'Séries',radio:'Radio'};for(const c of l){const g=o.split==='type'?TN[ctype(c)]:(grp(c)||'Sans groupe');if(!by.has(g))by.set(g,[]);by.get(g).push(c)}
+      const files=[...by].map(([g,cl],i)=>({name:String(i+1).padStart(3,'0')+' - '+safeName(g)+'.'+ext,data:build(o,cl)}));await saveFile(base+'.zip',makeZip(files))}
+    else await saveFile(base+'.'+ext,build(o,l));};
+}
+
+/* ============ Outils ============ */
+function openTool(t,scope){
+  const T={replace:toolReplace,clean:toolClean,dups:toolDups,sort:toolSort,number:toolNumber,regroup:toolRegroup,epg:toolEpg,xtream:toolXtream,props:toolProps,stats:toolStats,new:toolNew};
+  T[t]?.(scope);
+}
+const FIELDS=[['name','Nom'],['url','URL'],['group-title','Groupe'],['tvg-id','tvg-id'],['tvg-name','tvg-name'],['tvg-logo','tvg-logo'],['tvg-chno','tvg-chno']];
+const getF=(c,f)=>f==='name'?c.name:f==='url'?c.url:(c.attrs[f]||'');
+const setF=(c,f,v)=>{if(f==='name')c.name=v;else if(f==='url')c.url=v;else if(f==='group-title')setGrp(c,v);else if(v==='')delete c.attrs[f];else c.attrs[f]=v};
+
+function toolReplace(scope){
+  const sh=openModal('Rechercher et remplacer',`<div class="two"><div class="fld"><label for="rf">Champ</label><select class="in" id="rf">${FIELDS.map(([k,l])=>`<option value="${k}">${l}</option>`).join('')}<option value="*">Autre attribut…</option></select></div><div class="fld" id="rfo" hidden><label for="rfk">Nom de l’attribut</label><input class="in mono" id="rfk" placeholder="catchup-source"></div></div>
+<div class="two"><div class="fld"><label for="rs">Rechercher</label><input class="in mono" id="rs" spellcheck="false"></div><div class="fld"><label for="rr">Remplacer par</label><input class="in mono" id="rr" spellcheck="false" placeholder="(vide pour supprimer)"></div></div>
+<div class="opts"><label class="chk"><input type="checkbox" id="rx"><span>Expression régulière ($1, $2… dans le remplacement)</span></label><label class="chk"><input type="checkbox" id="rc"><span>Respecter la casse</span></label></div>
+${scopeHTML(scope)}<div class="fld"><label>Aperçu <span id="rcnt"></span></label><div class="scroll"><table class="tbl" id="rprev"></table></div></div>`,{wide:true,foot:`<button class="btn" data-close>Fermer</button><button class="btn pri" id="rgo">Remplacer</button>`});
+  const field=()=>{const f=$('#rf',sh).value;return f==='*'?normKey($('#rfk',sh).value.trim()):f};
+  const mk=()=>{const s=$('#rs',sh).value;if(!s)return null;const fl='g'+($('#rc',sh).checked?'':'i');try{return new RegExp($('#rx',sh).checked?s:rxEsc(s),fl)}catch{return 'bad'}};
+  const prev=()=>{$('#rfo',sh).hidden=$('#rf',sh).value!=='*';const re=mk(),f=field(),rep=$('#rr',sh).value;const tb=$('#rprev',sh);
+    if(re==='bad'){tb.innerHTML='<tr><td>Expression régulière invalide.</td></tr>';$('#rcnt',sh).textContent='';return}
+    if(!re||!f){tb.innerHTML='<tr><td class="note">Saisissez un texte à rechercher.</td></tr>';$('#rcnt',sh).textContent='';return}
+    const l=scopeList(sh);let n=0,rows='';for(const c of l){const v=getF(c,f);re.lastIndex=0;if(re.test(v)){n++;if(n<=12)rows+=`<tr><td class="mono">${esc(v)}</td><td class="mono">${esc(v.replace(re,rep))}</td></tr>`}}
+    tb.innerHTML=n?'<tr><th>Avant</th><th>Après</th></tr>'+rows:'<tr><td class="note">Aucune correspondance.</td></tr>';$('#rcnt',sh).textContent=`— ${fmt(n)} chaîne${n>1?'s':''} concernée${n>1?'s':''}`};
+  sh.addEventListener('input',prev);sh.addEventListener('change',prev);prev();
+  $('#rgo',sh).onclick=()=>{const re=mk(),f=field(),rep=$('#rr',sh).value;if(!re||re==='bad'||!f)return;const l=scopeList(sh);let n=0;
+    mutate(()=>{for(const c of l){const v=getF(c,f);re.lastIndex=0;if(re.test(v)){setF(c,f,v.replace(re,rep).trim());n++}}});toast(`${fmt(n)} valeur${n>1?'s':''} remplacée${n>1?'s':''}`);prev()};
+}
+
+const QUALITY=/(?:^|[\s\-|_\[(])(?:UHD|FHD|HD|SD|HQ|LQ|4K|8K|2160p|1080[pi]?|720p|576p|HEVC|H\.?26[45]|x26[45]|HDR|50\s?FPS|60\s?FPS|VIP|BACKUP|RAW|MULTI)(?=$|[\s\-|_\])])/gi;
+function cleanName(s,o){
+  let n=String(s||'');
+  if(o.symbols)n=n.replace(/[\u{1F000}-\u{1FAFF}\u2600-\u27BF\u2B00-\u2BFF★☆●◉►▶◆♦✪✦✧•▪︎■□▲▼◀▸]+/gu,' ').replace(/[ᴬ-ᵡ\u1D2C-\u1D6A\u02B0-\u02FF\u2070-\u209F]+/g,' ');
+  if(o.prefix)n=n.replace(/^\s*(?:\|\s*[A-Z]{2,4}\s*\||\[\s*[A-Z]{2,4}\s*\]|\(\s*[A-Z]{2,4}\s*\)|[A-Z]{2,4}\s*[:|»]|[A-Z]{2,4}\s+-\s)\s*/,'');
+  if(o.brackets)n=n.replace(/\s*[\[(][^\])]*[\])]/g,' ');
+  if(o.quality){for(let i=0;i<3;i++)n=n.replace(QUALITY,' ')}
+  n=n.replace(/[_]+/g,' ').replace(/\s{2,}/g,' ').replace(/^[\s\-|:.·]+|[\s\-|:.·]+$/g,'').trim();
+  if(o.case==='title')n=n.toLowerCase().replace(/(^|[\s\-'’(])(\p{L})/gu,(m,a,b)=>a+b.toUpperCase());
+  if(o.case==='upper')n=n.toUpperCase();if(o.case==='lower')n=n.toLowerCase();
+  return n||String(s||'');
+}
+function toolClean(scope){
+  const sh=openModal('Nettoyer les noms',`<div class="opts">
+<label class="chk"><input type="checkbox" id="cp" checked><span>Retirer le préfixe pays : « FR: », « FR | », « |FR| », « [FR] »</span></label>
+<label class="chk"><input type="checkbox" id="cq" checked><span>Retirer les mentions de qualité : HD, FHD, UHD, 4K, HEVC, 50 FPS…</span></label>
+<label class="chk"><input type="checkbox" id="cs" checked><span>Retirer les symboles et exposants décoratifs : ★ ● ᴴᴰ</span></label>
+<label class="chk"><input type="checkbox" id="cb"><span>Retirer le texte entre crochets ou parenthèses</span></label>
+<label class="chk"><input type="checkbox" id="ct"><span>Recopier le nom nettoyé dans tvg-name</span></label></div>
+<div class="fld"><label>Casse</label><div class="seg"><label><input type="radio" name="cc" value="" checked><span>Inchangée</span></label><label><input type="radio" name="cc" value="title"><span>Titre</span></label><label><input type="radio" name="cc" value="upper"><span>MAJUSCULES</span></label><label><input type="radio" name="cc" value="lower"><span>minuscules</span></label></div></div>
+${scopeHTML(scope)}<div class="fld"><label>Aperçu <span id="ccnt"></span></label><div class="scroll"><table class="tbl" id="cprev"></table></div></div>`,{wide:true,foot:`<button class="btn" data-close>Fermer</button><button class="btn pri" id="cgo">Nettoyer</button>`});
+  const o=()=>({prefix:$('#cp',sh).checked,quality:$('#cq',sh).checked,symbols:$('#cs',sh).checked,brackets:$('#cb',sh).checked,case:$('input[name=cc]:checked',sh).value});
+  const prev=()=>{const op=o(),l=scopeList(sh);let n=0,rows='';for(const c of l){const v=cleanName(c.name,op);if(v!==c.name){n++;if(n<=14)rows+=`<tr><td>${esc(c.name)}</td><td>${esc(v)}</td></tr>`}}
+    $('#cprev',sh).innerHTML=n?'<tr><th>Avant</th><th>Après</th></tr>'+rows:'<tr><td class="note">Aucun nom ne change avec ces réglages.</td></tr>';$('#ccnt',sh).textContent=`— ${fmt(n)} nom${n>1?'s':''} modifié${n>1?'s':''}`};
+  sh.addEventListener('change',prev);prev();
+  $('#cgo',sh).onclick=()=>{const op=o(),tn=$('#ct',sh).checked,l=scopeList(sh);let n=0;mutate(()=>{for(const c of l){const v=cleanName(c.name,op);if(v!==c.name){c.name=v;n++}if(tn)c.attrs['tvg-name']=c.name}});toast(`${fmt(n)} noms nettoyés`);closeModal()};
+}
+
+function toolDups(){
+  const sh=openModal('Doublons',`<div class="fld"><label>Comparer par</label><div class="seg"><label><input type="radio" name="dk" value="url" checked><span>URL du flux</span></label><label><input type="radio" name="dk" value="name"><span>Nom (normalisé)</span></label><label><input type="radio" name="dk" value="id"><span>tvg-id</span></label><label><input type="radio" name="dk" value="ng"><span>Nom + groupe</span></label></div></div>
+<p class="note">Le nom normalisé ignore la casse, les accents, le préfixe pays et les mentions de qualité : « FR: Info 24 HD » et « info 24 » sont des doublons.</p>
+<div id="dres"></div>`,{wide:true,foot:`<button class="btn" data-close>Fermer</button><button class="btn" id="dsel">Sélectionner les doublons</button><button class="btn pri" id="ddel">Supprimer les doublons</button>`});
+  let extra=[];
+  const run=()=>{const k=$('input[name=dk]:checked',sh).value;const key=c=>k==='url'?(c.url||'').trim():k==='name'?normName(c.name):k==='id'?(c.attrs['tvg-id']||'').trim().toLowerCase():normName(c.name)+'|'+grp(c);
+    const m=new Map();for(const c of S.chans){const kk=key(c);if(!kk)continue;if(!m.has(kk))m.set(kk,[]);m.get(kk).push(c)}
+    const g=[...m.values()].filter(a=>a.length>1);extra=g.flatMap(a=>a.slice(1));
+    $('#dres',sh).innerHTML=g.length?`<p style="margin:0"><b>${fmt(g.length)}</b> série${g.length>1?'s':''} de doublons, <b>${fmt(extra.length)}</b> entrée${extra.length>1?'s':''} en trop. La première de chaque série est conservée.</p>
+<div class="scroll"><table class="tbl"><tr><th>Conservée</th><th>Doublons</th><th>Groupes</th></tr>${g.slice(0,80).map(a=>`<tr><td>${esc(a[0].name)}</td><td class="n">${a.length-1}</td><td>${esc([...new Set(a.map(c=>gLabel(grp(c))))].join(', '))}</td></tr>`).join('')}</table></div>`:'<p class="note" style="margin:0">Aucun doublon avec ce critère.</p>';
+    $('#ddel',sh).disabled=$('#dsel',sh).disabled=!extra.length};
+  sh.addEventListener('change',run);run();
+  $('#dsel',sh).onclick=()=>{S.sel=new Set(extra.map(c=>c.id));S.cur=null;S.f.g='*';closeModal();refresh();openInsp();toast(`${fmt(extra.length)} doublons sélectionnés`)};
+  $('#ddel',sh).onclick=()=>{const ids=extra.map(c=>c.id);closeModal();delIds(ids)};
+}
+
+function toolSort(){
+  const sh=openModal('Trier',`<div class="fld"><label>Critère</label><div class="seg"><label><input type="radio" name="sk" value="name" checked><span>Nom</span></label><label><input type="radio" name="sk" value="tvg-chno"><span>Numéro</span></label><label><input type="radio" name="sk" value="tvg-id"><span>tvg-id</span></label><label><input type="radio" name="sk" value="group"><span>Groupe</span></label><label><input type="radio" name="sk" value="type"><span>Type</span></label></div></div>
+<div class="fld"><label>Ordre</label><div class="seg"><label><input type="radio" name="sd" value="1" checked><span>Croissant</span></label><label><input type="radio" name="sd" value="-1"><span>Décroissant</span></label></div></div>
+<div class="opts"><label class="chk"><input type="checkbox" id="sg" checked><span>Garder l’ordre des groupes et trier à l’intérieur de chacun</span></label>
+<label class="chk"><input type="checkbox" id="sf"><span>Limiter au groupe affiché (${esc(S.f.g==='*'?'toutes les chaînes':gLabel(S.f.g))})</span></label></div>
+<p class="note">Le tri est naturel : « Sport 2 » passe avant « Sport 10 ».</p>`,{foot:`<button class="btn" data-close>Fermer</button><button class="btn" id="sgr">Trier les groupes A→Z</button><button class="btn pri" id="sgo">Trier les chaînes</button>`});
+  $('#sgo',sh).onclick=()=>{const k=$('input[name=sk]:checked',sh).value,d=+$('input[name=sd]:checked',sh).value,inG=$('#sg',sh).checked,onlyF=$('#sf',sh).checked&&S.f.g!=='*';
+    const val=c=>k==='name'?c.name:k==='group'?grp(c):k==='type'?ctype(c):(c.attrs[k]||'\uffff');
+    mutate(()=>{const gi=new Map(S.order.map((g,i)=>[g,i]));
+      const cmp=(a,b)=>(inG&&k!=='group'?gi.get(grp(a))-gi.get(grp(b)):0)||d*coll.compare(val(a),val(b));
+      if(onlyF){const idx=[];S.chans.forEach((c,i)=>{if(grp(c)===S.f.g)idx.push(i)});const sub=idx.map(i=>S.chans[i]).sort(cmp);idx.forEach((i,j)=>S.chans[i]=sub[j])}
+      else S.chans.sort(cmp);
+      if(k==='group'){const seen=[];for(const c of S.chans)if(!seen.includes(grp(c)))seen.push(grp(c));S.order=seen.concat(S.order.filter(g=>!seen.includes(g)))}},'Chaînes triées');closeModal()};
+  $('#sgr',sh).onclick=()=>{const d=+$('input[name=sd]:checked',sh).value;mutate(()=>{S.order.sort((a,b)=>d*coll.compare(a||'\uffff',b||'\uffff'));clusterByGroups()},'Groupes triés');closeModal()};
+}
+
+function toolNumber(scope){
+  const sh=openModal('Numéroter les chaînes',`<div class="three"><div class="fld"><label for="nst">Premier numéro</label><input class="in mono" id="nst" type="number" value="1"></div><div class="fld"><label for="nstep">Pas</label><input class="in mono" id="nstep" type="number" value="1" min="1"></div><div class="fld"><label for="ngap">Saut entre groupes</label><input class="in mono" id="ngap" type="number" value="0" min="0"></div></div>
+<div class="opts"><label class="chk"><input type="checkbox" id="nround"><span>Faire commencer chaque groupe à la centaine suivante (100, 200…)</span></label></div>
+${scopeHTML(scope)}<p class="note">Les numéros sont écrits dans l’attribut tvg-chno, que lisent TiviMate, Kodi et la plupart des lecteurs, dans l’ordre actuel de la playlist.</p>`,
+  {foot:`<button class="btn danger" id="nclr">Retirer les numéros</button><button class="btn" data-close>Fermer</button><button class="btn pri" id="ngo">Numéroter</button>`});
+  $('#ngo',sh).onclick=()=>{let n=+$('#nst',sh).value||1;const st=Math.max(1,+$('#nstep',sh).value||1),gap=+$('#ngap',sh).value||0,round=$('#nround',sh).checked;const l=scopeList(sh);
+    mutate(()=>{let pg=null;for(const c of l){if(pg!==null&&grp(c)!==pg){n+=gap;if(round)n=Math.ceil(n/100)*100}pg=grp(c);c.attrs['tvg-chno']=String(n);n+=st}},`${fmt(l.length)} chaînes numérotées`);closeModal()};
+  $('#nclr',sh).onclick=()=>{const l=scopeList(sh);mutate(()=>l.forEach(c=>delete c.attrs['tvg-chno']),'Numéros retirés');closeModal()};
+}
+
+function toolRegroup(scope){
+  const sh=openModal('Regrouper automatiquement',`<div class="tabs" id="rgt"><button data-t="prefix" class="on">Par préfixe du nom</button><button data-t="type">Par type de flux</button><button data-t="series">Par série</button><button data-t="rules">Par règles</button></div>
+<div id="rgp"></div>${scopeHTML(scope)}<div class="fld"><label>Aperçu <span id="rgcnt"></span></label><div class="scroll"><table class="tbl" id="rgprev"></table></div></div>`,{wide:true,foot:`<button class="btn" data-close>Fermer</button><button class="btn pri" id="rggo">Regrouper</button>`});
+  let tab='prefix';
+  const panels={prefix:`<div class="two"><div class="fld"><label for="rgsep">Séparateur</label><select class="in" id="rgsep"><option value="[:|]">« : » ou « | »</option><option value=" - ">« - »</option><option value="\\]">« [FR] » (crochets)</option><option value="\\s">Premier mot</option></select></div><div class="fld"><label for="rgfmt">Nom du groupe</label><input class="in" id="rgfmt" value="{p}" spellcheck="false"></div></div><div class="opts"><label class="chk"><input type="checkbox" id="rgstrip" checked><span>Retirer le préfixe du nom de la chaîne</span></label></div><p class="note">{p} est remplacé par le préfixe trouvé, {g} par le groupe actuel. Exemple : « FR | {g} ».</p>`,
+    type:`<div class="three"><div class="fld"><label for="rgl">Direct</label><input class="in" id="rgl" value="Chaînes TV"></div><div class="fld"><label for="rgf">Films</label><input class="in" id="rgf" value="Films"></div><div class="fld"><label for="rgs">Séries</label><input class="in" id="rgs" value="Séries"></div></div><div class="opts"><label class="chk"><input type="checkbox" id="rgkeep" checked><span>Garder le groupe d’origine en sous-titre : « Films | Action »</span></label></div><p class="note">Le type se déduit de l’URL : /movie/ pour les films, /series/ pour les séries (format Xtream Codes), extension .mp4 ou .mkv pour les films.</p>`,
+    series:`<div class="fld"><label for="rgsf">Nom du groupe</label><input class="in" id="rgsf" value="Séries | {s}" spellcheck="false"></div><p class="note">Repère les épisodes nommés « Série S01 E02 », « Série S01E02 » ou « Série 1x02 » et range chaque série dans son propre groupe. {s} est le nom de la série, {g} le groupe actuel.</p>`,
+    rules:`<div class="fld"><label for="rgr">Une règle par ligne : expression => groupe (sur le nom, insensible à la casse)</label><textarea class="ta" id="rgr" style="min-height:140px" spellcheck="false">sport|foot|ligue|tennis => Sport\ninfo|news|actu => Information\nkids|enfant|jeunesse|cartoon => Jeunesse\ncin[eé]|movie|film => Cinéma\ndoc|discovery|histoire|nature => Documentaires</textarea></div><p class="note">La première règle qui correspond s’applique. Les chaînes sans correspondance gardent leur groupe.</p>`};
+  const show=()=>{$$('#rgt button',sh).forEach(b=>b.classList.toggle('on',b.dataset.t===tab));$('#rgp',sh).innerHTML=panels[tab];prev()};
+  const plan=()=>{const l=scopeList(sh),out=[];
+    if(tab==='prefix'){const sep=$('#rgsep',sh).value,fm=$('#rgfmt',sh).value||'{p}',strip=$('#rgstrip',sh).checked;
+      const re=sep==='\\]'?/^\s*\[([^\]]{1,24})\]\s*(.*)$/:new RegExp('^\\s*([^\\n]{1,24}?)\\s*(?:'+sep+')\\s*(.+)$');
+      for(const c of l){const m=c.name.match(re);if(m&&m[1].trim()&&m[2].trim()){out.push([c,fm.replace('{p}',m[1].replace(/^[|\[(]+|[|\])]+$/g,'').trim()).replace('{g}',grp(c)).trim(),strip?m[2].trim():c.name])}}}
+    if(tab==='type'){const lab={live:$('#rgl',sh).value,film:$('#rgf',sh).value,serie:$('#rgs',sh).value,radio:'Radio'},keep=$('#rgkeep',sh).checked;
+      for(const c of l){const b=lab[ctype(c)];if(!b)continue;out.push([c,keep&&grp(c)?b+' | '+grp(c):b,c.name])}}
+    if(tab==='series'){const fm=$('#rgsf',sh).value||'{s}',re=/^(.*?)[\s._\-–|:]*(?:S(\d{1,2})\s*E(\d{1,3})|(\d{1,2})x(\d{2,3}))\b/i;
+      for(const c of l){const m=c.name.match(re);if(m&&m[1].trim())out.push([c,fm.replace('{s}',m[1].replace(/[\s\-–|:]+$/,'').trim()).replace('{g}',grp(c)).trim(),c.name])}}
+    if(tab==='rules'){const rules=$('#rgr',sh).value.split('\n').map(s=>s.split('=>')).filter(a=>a.length===2).map(([r,g])=>{try{return[new RegExp(r.trim(),'i'),g.trim()]}catch{return null}}).filter(Boolean);
+      for(const c of l){const r=rules.find(([re])=>re.test(c.name));if(r)out.push([c,r[1],c.name])}}
+    return out.filter(([c,g,n])=>g!==grp(c)||n!==c.name)};
+  const prev=()=>{const p=plan();$('#rgcnt',sh).textContent=`— ${fmt(p.length)} chaîne${p.length>1?'s':''} concernée${p.length>1?'s':''}`;
+    $('#rgprev',sh).innerHTML=p.length?'<tr><th>Chaîne</th><th>Nouveau nom</th><th>Nouveau groupe</th></tr>'+p.slice(0,14).map(([c,g,n])=>`<tr><td>${esc(c.name)}</td><td>${esc(n)}</td><td>${esc(g)}</td></tr>`).join(''):'<tr><td class="note">Aucune chaîne concernée.</td></tr>'};
+  $('#rgt',sh).onclick=e=>{const b=e.target.closest('button');if(b){tab=b.dataset.t;show()}};sh.addEventListener('input',prev);sh.addEventListener('change',prev);show();
+  $('#rggo',sh).onclick=()=>{const p=plan();mutate(()=>{for(const[c,g,n]of p){setGrp(c,g);c.name=n}clusterByGroups()},`${fmt(p.length)} chaînes regroupées`);closeModal()};
+}
+
+function toolEpg(){
+  const cur=S.header['url-tvg']||S.header['x-tvg-url']||'';
+  const sh=openModal('Guide EPG (XMLTV)',`<div class="fld"><label for="eu">Adresse du guide dans l’en-tête (url-tvg et x-tvg-url)</label><div class="inrow"><input class="in mono" id="eu" value="${esc(cur)}" placeholder="https://exemple.com/epg.xml.gz" spellcheck="false"><button class="btn" id="esave">Enregistrer</button></div><p class="note" style="margin:0">Séparez plusieurs guides par une virgule.</p></div>
+<div class="fs"><h4>Associer les identifiants EPG</h4><p class="note" style="margin:0">Chargez un fichier XMLTV (.xml ou .xml.gz). L’atelier rapproche les noms de chaînes des noms du guide et remplit tvg-id, et le logo si vous le souhaitez.</p>
+<div class="drop" id="edrop" tabindex="0"><strong>Choisir un fichier XMLTV</strong><span>ou déposez-le ici</span></div>${HAS_PROXY?'<div><button class="btn sm" id="eurl">Charger le guide depuis l’adresse ci-dessus</button></div>':''}<input type="file" id="efile" accept=".xml,.gz,.xmltv" hidden>
+<div class="opts"><label class="chk"><input type="checkbox" id="eover"><span>Remplacer aussi les tvg-id déjà renseignés</span></label><label class="chk"><input type="checkbox" id="elogo" checked><span>Ajouter le logo du guide aux chaînes qui n’en ont pas</span></label></div>
+<div id="eres"></div></div>`,{wide:true,foot:`<button class="btn" data-close>Fermer</button><button class="btn pri" id="ego" disabled>Associer</button>`});
+  $('#esave',sh).onclick=()=>{const v=$('#eu',sh).value.trim();mutate(()=>{if(v){S.header['url-tvg']=v;S.header['x-tvg-url']=v}else{delete S.header['url-tvg'];delete S.header['x-tvg-url']}},'Guide enregistré dans l’en-tête')};
+  let map=null,plan=[];
+  const load=async f=>{try{$('#eres',sh).innerHTML='<p class="note">Lecture du guide…</p>';const txt=typeof f==='string'?await getText(f):await readFile(f);const doc=new DOMParser().parseFromString(txt,'text/xml');
+    const chs=[...doc.getElementsByTagName('channel')];if(!chs.length)throw new Error('aucune balise <channel>');map=new Map();
+    for(const ch of chs){const id=ch.getAttribute('id');const icon=ch.getElementsByTagName('icon')[0]?.getAttribute('src')||'';for(const dn of ch.getElementsByTagName('display-name')){const k=normName(dn.textContent);if(k&&!map.has(k))map.set(k,{id,icon})}const k2=normName(id.replace(/\.[a-z]{2,3}$/i,''));if(k2&&!map.has(k2))map.set(k2,{id,icon})}
+    compute(chs.length)}catch(e){$('#eres',sh).innerHTML=`<p class="note warn">Lecture impossible : ${esc(e.message)}.</p>`}};
+  const compute=n=>{if(!map)return;const over=$('#eover',sh).checked;plan=[];for(const c of S.chans){if(!over&&c.attrs['tvg-id'])continue;const m=map.get(normName(c.name))||map.get(normName(c.attrs['tvg-name']||''));if(m&&m.id!==c.attrs['tvg-id'])plan.push([c,m])}
+    $('#eres',sh).innerHTML=`<p style="margin:0">${n?`<b>${fmt(n)}</b> chaînes dans le guide. `:''}<b>${fmt(plan.length)}</b> association${plan.length>1?'s':''} trouvée${plan.length>1?'s':''}.</p>${plan.length?`<div class="scroll"><table class="tbl"><tr><th>Chaîne</th><th>tvg-id proposé</th></tr>${plan.slice(0,60).map(([c,m])=>`<tr><td>${esc(c.name)}</td><td class="mono">${esc(m.id)}</td></tr>`).join('')}</table></div>`:''}`;$('#ego',sh).disabled=!plan.length};
+  const d=$('#edrop',sh);d.onclick=()=>$('#efile',sh).click();d.onkeydown=e=>{if(e.key==='Enter')d.click()};d.ondragover=e=>{e.preventDefault();d.classList.add('on')};d.ondragleave=()=>d.classList.remove('on');
+  d.ondrop=e=>{e.preventDefault();e.stopPropagation();d.classList.remove('on');if(e.dataTransfer.files[0])load(e.dataTransfer.files[0])};
+  $('#efile',sh).onchange=e=>{if(e.target.files[0])load(e.target.files[0])};const eb=$('#eurl',sh);if(eb)eb.onclick=()=>{const v=$('#eu',sh).value.split(',')[0].trim();if(!v){toast('Indiquez d’abord l’adresse du guide.','err');return}load(v)};$('#eover',sh).onchange=()=>compute(0);
+  $('#ego',sh).onclick=()=>{const lg=$('#elogo',sh).checked;mutate(()=>{for(const[c,m]of plan){c.attrs['tvg-id']=m.id;if(lg&&m.icon&&!c.attrs['tvg-logo'])c.attrs['tvg-logo']=m.icon}},`${fmt(plan.length)} identifiants EPG associés`);closeModal()};
+}
+
+const XRE=/^(https?:\/\/[^/\s]+)\/(?:(live|movie|series|timeshift)\/)?([^/\s]+)\/([^/\s]+)\/(\d+)(\.[a-z0-9]+)?(\?.*)?$/i;
+function xtreamForm(){return `<div class="two"><div class="fld"><label for="xh">Serveur</label><input class="in mono" id="xh" placeholder="http://serveur.exemple:8080" spellcheck="false"></div><div class="fld"><label for="xo">Format des chaînes en direct</label><select class="in" id="xo"><option value="ts">MPEG-TS (.ts)</option><option value="m3u8">HLS (.m3u8)</option></select></div></div>
+<div class="two"><div class="fld"><label for="xu">Identifiant</label><input class="in mono" id="xu" autocomplete="off" spellcheck="false"></div><div class="fld"><label for="xp">Mot de passe</label><input class="in mono" id="xp" type="password" autocomplete="off"></div></div>
+<div class="fld"><label>Contenu à importer</label><div class="opts">
+<label class="chk"><input type="checkbox" id="xcl" checked><span>Chaînes en direct</span></label>
+<label class="chk"><input type="checkbox" id="xcv" checked><span>Films (VOD), avec affiche, année et note</span></label>
+<label class="chk"><input type="checkbox" id="xcs" checked><span>Séries, épisode par épisode (une requête par série : comptez quelques minutes pour un gros catalogue)</span></label></div></div>
+<div class="two"><div class="fld"><label>Groupes des séries</label><div class="seg"><label><input type="radio" name="xsg" value="cat" checked><span>Par catégorie</span></label><label><input type="radio" name="xsg" value="show"><span>Un par série</span></label></div></div>
+<div class="fld"><label>Groupes VOD</label><label class="chk"><input type="checkbox" id="xpre" checked><span>Préfixer par « Films | » et « Séries | »</span></label></div></div>
+<div class="fld"><label>Adresse M3U équivalente (get.php)</label><div class="inrow"><input class="in mono" id="xurl" readonly><button class="ib" id="xcp" title="Copier">${ICON.copy}</button></div></div>
+<div class="fld"><label>Adresse du guide EPG</label><div class="inrow"><input class="in mono" id="xepg" readonly><button class="ib" id="xcpe" title="Copier">${ICON.copy}</button></div></div>
+<div class="acts"><button class="btn pri" id="xapi">Importer via l’API Xtream</button><button class="btn" id="xload">Charger l’adresse M3U</button><button class="btn" id="xsetepg">Utiliser ce guide</button><button class="btn danger" id="xstop" hidden>Arrêter</button></div>
+<p class="note warn" id="xprog" hidden></p>
+<p class="note">Les identifiants ne partent que vers le serveur indiqué${HAS_PROXY?', au besoin par le relais Cloudflare de l’atelier, qui ne conserve rien':''}.</p>`}
+const cleanObj=o=>Object.fromEntries(Object.entries(o).filter(([,v])=>v!=null&&String(v).trim()!==''&&v!=='null').map(([k,v])=>[k,String(v).trim()]));
+const asArr=v=>Array.isArray(v)?v:(v&&typeof v==='object'?Object.values(v):[]);
+async function xtreamApiImport(o,prog,signal){
+  const h=o.host.trim().replace(/\/+$/,''),eu=encodeURIComponent(o.user.trim()),ep=encodeURIComponent(o.pass);
+  if(!/^https?:\/\//i.test(h))throw new Error('l’adresse du serveur doit commencer par http:// ou https://');
+  const base=`${h}/player_api.php?username=${eu}&password=${ep}`;
+  prog('Connexion au serveur…');
+  const auth=await getJSON(base,{signal});
+  if(!auth||!auth.user_info||String(auth.user_info.auth)==='0')throw new Error('identifiants refusés par le serveur');
+  if(auth.user_info.status&&!/active/i.test(auth.user_info.status))throw new Error('abonnement '+auth.user_info.status);
+  const cats=async a=>new Map(asArr(await getJSON(base+'&action='+a,{signal})).map(c=>[String(c.category_id),c.category_name]));
+  const out=[],pre=o.pre;
+  if(o.live){prog('Chaînes en direct…');const cm=await cats('get_live_categories');
+    for(const s of asArr(await getJSON(base+'&action=get_live_streams',{signal}))){const c=blank();c.name=s.name||'';c.url=`${h}/live/${eu}/${ep}/${s.stream_id}.${o.ext}`;
+      Object.assign(c.attrs,cleanObj({'tvg-id':s.epg_channel_id,'tvg-name':s.name,'tvg-logo':s.stream_icon,'group-title':cm.get(String(s.category_id))||'Direct'}));
+      if(+s.tv_archive===1){c.attrs.catchup='xc';if(s.tv_archive_duration)c.attrs['catchup-days']=String(s.tv_archive_duration)}out.push(c)}}
+  if(o.vod){prog('Films…');const cm=await cats('get_vod_categories');
+    for(const s of asArr(await getJSON(base+'&action=get_vod_streams',{signal}))){const c=blank();c.name=s.name||'';c.url=`${h}/movie/${eu}/${ep}/${s.stream_id}.${s.container_extension||'mp4'}`;
+      Object.assign(c.attrs,cleanObj({'tvg-name':s.name,'tvg-logo':s.stream_icon,'group-title':(pre?'Films | ':'')+(cm.get(String(s.category_id))||'Films')}));
+      c.meta=cleanObj({kind:'film',year:s.year||(s.releaseDate||s.release_date||'').slice(0,4),rating:s.rating&&+s.rating?(+s.rating).toFixed(1):''});out.push(c)}}
+  if(o.series){prog('Liste des séries…');const cm=await cats('get_series_categories');const list=asArr(await getJSON(base+'&action=get_series',{signal}));
+    const res=new Array(list.length);let next=0,done=0,fails=0;
+    const one=async s=>{let info=null;try{info=await getJSON(base+'&action=get_series_info&series_id='+encodeURIComponent(s.series_id),{signal})}catch(e){if(e.name==='AbortError')throw e;fails++}
+      done++;if(done%4===0||done===list.length)prog(`Séries : ${fmt(done)} / ${fmt(list.length)}…`);
+      const r=[];if(!info)return r;const g=(pre?'Séries | ':'')+(o.sg==='show'?s.name:(cm.get(String(s.category_id))||'Séries'));
+      for(const[season,eps]of Object.entries(info.episodes||{}))for(const e of asArr(eps)){const c=blank();
+        const sn=String(e.season??season).padStart(2,'0'),en=String(e.episode_num??'').padStart(2,'0');
+        c.name=`${s.name} S${sn} E${en}`;c.url=`${h}/series/${eu}/${ep}/${e.id}.${e.container_extension||'mp4'}`;
+        Object.assign(c.attrs,cleanObj({'tvg-name':c.name,'tvg-logo':e.info?.movie_image||s.cover,'group-title':g}));
+        c.meta=cleanObj({kind:'serie',show:s.name,season:+sn||'',episode:+en||'',title:e.title&&e.title!==c.name?e.title:'',year:(s.releaseDate||s.release_date||'').slice(0,4),rating:s.rating&&+s.rating?(+s.rating).toFixed(1):''});r.push(c)}
+      return r};
+    await Promise.all(Array.from({length:Math.min(6,list.length)},async()=>{while(next<list.length){const k=next++;res[k]=await one(list[k])}}));
+    for(const r of res)out.push(...(r||[]));if(fails)toast(`${fmt(fails)} série${fails>1?'s':''} n’ont pas répondu et ont été ignorées.`,'err')}
+  return{chans:out,epg:`${h}/xmltv.php?username=${eu}&password=${ep}`};
+}
+function bindXtreamForm(p,mode){
+  const upd=()=>{const h=$('#xh',p).value.trim().replace(/\/+$/,''),u=encodeURIComponent($('#xu',p).value.trim()),pw=encodeURIComponent($('#xp',p).value);
+    $('#xurl',p).value=h&&u?`${h}/get.php?username=${u}&password=${pw}&type=m3u_plus&output=${$('#xo',p).value}`:'';$('#xepg',p).value=h&&u?`${h}/xmltv.php?username=${u}&password=${pw}`:''};
+  p.addEventListener('input',upd);p.addEventListener('change',upd);
+  const first=S.sample?null:S.chans.map(c=>c.url.match(XRE)).find(Boolean);if(first){$('#xh',p).value=first[1];$('#xu',p).value=decodeURIComponent(first[3]);$('#xp',p).value=decodeURIComponent(first[4]);}upd();
+  $('#xcp',p).onclick=()=>$('#xurl',p).value&&copyText($('#xurl',p).value,'Adresse');$('#xcpe',p).onclick=()=>$('#xepg',p).value&&copyText($('#xepg',p).value,'Adresse');
+  $('#xload',p).onclick=()=>{const u=$('#xurl',p).value;if(!u){toast('Renseignez le serveur et l’identifiant.','err');return}importUrl(u,mode?mode():'replace')};
+  $('#xsetepg',p).onclick=()=>{const v=$('#xepg',p).value;if(!v)return;mutate(()=>{S.header['url-tvg']=v;S.header['x-tvg-url']=v},'Guide enregistré dans l’en-tête')};
+  let ctl=null;const pr=$('#xprog',p);const prog=t=>{pr.hidden=false;pr.textContent=t};
+  $('#xstop',p).onclick=()=>ctl?.abort();
+  $('#xapi',p).onclick=async()=>{
+    const o={host:$('#xh',p).value,user:$('#xu',p).value,pass:$('#xp',p).value,ext:$('#xo',p).value,live:$('#xcl',p).checked,vod:$('#xcv',p).checked,series:$('#xcs',p).checked,sg:$('input[name=xsg]:checked',p).value,pre:$('#xpre',p).checked};
+    if(!o.host.trim()||!o.user.trim()){toast('Renseignez le serveur et l’identifiant.','err');return}
+    if(!o.live&&!o.vod&&!o.series){toast('Cochez au moins un type de contenu.','err');return}
+    const m=mode?mode():'replace';ctl=new AbortController();$('#xstop',p).hidden=false;$('#xapi',p).disabled=true;
+    try{const r=await xtreamApiImport(o,prog,ctl.signal);prog(`${fmt(r.chans.length)} entrées reçues, intégration…`);
+      const hdr=S.header['url-tvg']&&m==='append'?{}:{'url-tvg':r.epg,'x-tvg-url':r.epg};
+      if(applyImport({header:hdr,chans:r.chans},m,'le serveur Xtream')){if(m==='replace'){try{S.name=new URL(o.host.trim()).hostname}catch{}$('#pname').value=S.name;autosave()}closeModal()}}
+    catch(e){if(e.name==='AbortError')prog('Import arrêté.');else prog('Import impossible : '+(e.message||'connexion refusée')+'.')}
+    finally{ctl=null;const b=$('#xapi',p);if(b){b.disabled=false;$('#xstop',p).hidden=true}}
+  };
+}
+function toolXtream(){
+  const found=new Map();for(const c of S.chans){const m=c.url.match(XRE);if(!m)continue;const k=m[1]+'\n'+m[3]+'\n'+m[4];found.set(k,(found.get(k)||0)+1)}
+  const rows=[...found].sort((a,b)=>b[1]-a[1]);
+  const sh=openModal('Xtream Codes',`<div class="tabs" id="xtt"><button data-t="swap" class="on">Changer de serveur ou d’identifiants</button><button data-t="build">Générer l’adresse</button></div><div id="xtp"></div>`,{wide:true});
+  const show=t=>{$$('#xtt button',sh).forEach(b=>b.classList.toggle('on',b.dataset.t===t));const p=$('#xtp',sh);
+    if(t==='build'){p.innerHTML=xtreamForm();bindXtreamForm(p,()=>S.sample||!S.chans.length?'replace':'append');return}
+    p.innerHTML=rows.length?`<p class="note" style="margin:0">Comptes détectés dans les URL de la playlist :</p><div class="scroll"><table class="tbl"><tr><th></th><th>Serveur</th><th>Identifiant</th><th>Chaînes</th></tr>${rows.map(([k,n],i)=>{const[h,u]=k.split('\n');return`<tr><td><input type="radio" name="xacc" value="${i}" ${i===0?'checked':''} aria-label="Choisir"></td><td class="mono">${esc(h)}</td><td class="mono">${esc(decodeURIComponent(u))}</td><td class="n">${fmt(n)}</td></tr>`}).join('')}</table></div>
+<div class="three"><div class="fld"><label for="nh">Nouveau serveur</label><input class="in mono" id="nh" placeholder="inchangé" spellcheck="false"></div><div class="fld"><label for="nu">Nouvel identifiant</label><input class="in mono" id="nu" placeholder="inchangé" autocomplete="off"></div><div class="fld"><label for="np">Nouveau mot de passe</label><input class="in mono" id="np" placeholder="inchangé" autocomplete="off"></div></div>
+<div class="fld"><label>Extension des flux en direct</label><div class="seg"><label><input type="radio" name="next" value="" checked><span>Inchangée</span></label><label><input type="radio" name="next" value=".ts"><span>.ts</span></label><label><input type="radio" name="next" value=".m3u8"><span>.m3u8</span></label><label><input type="radio" name="next" value="none"><span>Aucune</span></label></div></div>
+<div><button class="btn pri" id="xswap">Mettre à jour les URL</button></div>`:'<p class="note" style="margin:0">Aucune URL au format Xtream Codes (serveur/identifiant/mot de passe/numéro) dans cette playlist. Utilisez l’onglet « Générer l’adresse » pour en charger une.</p>';
+    const b=$('#xswap',p);if(b)b.onclick=()=>{const i=+$('input[name=xacc]:checked',p).value;const[h,u,pw]=rows[i][0].split('\n');const nh=$('#nh',p).value.trim().replace(/\/+$/,'')||h,nu=$('#nu',p).value.trim()?encodeURIComponent($('#nu',p).value.trim()):u,np=$('#np',p).value.trim()?encodeURIComponent($('#np',p).value.trim()):pw,ext=$('input[name=next]:checked',p).value;let n=0;
+      mutate(()=>{for(const c of S.chans){const m=c.url.match(XRE);if(!m||m[1]!==h||m[3]!==u||m[4]!==pw)continue;let e=m[6]||'';if(ext&&(!m[2]||m[2]==='live'))e=ext==='none'?'':ext;
+        c.url=`${nh}/${m[2]?m[2]+'/':''}${nu}/${np}/${m[5]}${e}${m[7]||''}`;n++}
+        for(const k of ['url-tvg','x-tvg-url']){const v=S.header[k];if(v&&v.includes(h))S.header[k]=v.split(h).join(nh).replace('username='+u,'username='+nu).replace('password='+pw,'password='+np)}});
+      toast(`${fmt(n)} URL mises à jour`);closeModal()};
+  };
+  $('#xtt',sh).onclick=e=>{const b=e.target.closest('button');if(b)show(b.dataset.t)};show(rows.length?'swap':'build');
+}
+
+function toolProps(){
+  const keys=Object.keys(S.header);
+  const sh=openModal('Propriétés de la playlist',`<p class="note" style="margin:0">Attributs de la ligne #EXTM3U, lus par les lecteurs au chargement : guide EPG, décalage horaire, replay par défaut.</p>
+<div id="hkv" style="display:grid;gap:6px">${(keys.length?keys:['url-tvg']).map(k=>`<div class="kv"><input class="in mono" value="${esc(k)}" aria-label="Attribut"><input class="in mono" value="${esc(S.header[k]||'')}" aria-label="Valeur"><button class="ib" data-del title="Retirer">${ICON.x}</button></div>`).join('')}</div>
+<div class="acts"><button class="btn sm" id="hadd">Ajouter un attribut</button><button class="btn sm" id="hsug">Ajouter tvg-shift, catchup…</button></div><div class="pre" id="hprev"></div>`,{foot:`<button class="btn" data-close>Annuler</button><button class="btn pri" id="hgo">Enregistrer</button>`});
+  const row=(k='',v='')=>`<div class="kv"><input class="in mono" value="${esc(k)}" aria-label="Attribut"><input class="in mono" value="${esc(v)}" aria-label="Valeur"><button class="ib" data-del title="Retirer">${ICON.x}</button></div>`;
+  const read=()=>{const o={};for(const r of $$('#hkv .kv',sh)){const k=r.children[0].value.trim();if(k)o[k]=r.children[1].value}return o};
+  const prev=()=>{const a=attrStr(read(),'all');$('#hprev',sh).textContent='#EXTM3U'+(a?' '+a:'')};
+  $('#hadd',sh).onclick=()=>{$('#hkv',sh).insertAdjacentHTML('beforeend',row());prev()};
+  $('#hsug',sh).onclick=()=>{const have=read();for(const[k,v]of[['x-tvg-url',have['url-tvg']||''],['tvg-shift','0'],['catchup','default'],['catchup-days','7']])if(!(k in have))$('#hkv',sh).insertAdjacentHTML('beforeend',row(k,v));prev()};
+  sh.addEventListener('click',e=>{if(e.target.closest('[data-del]')){e.target.closest('.kv').remove();prev()}});sh.addEventListener('input',prev);prev();
+  $('#hgo',sh).onclick=()=>{const o=read();mutate(()=>{S.header=o},'Propriétés enregistrées');closeModal()};
+}
+
+function toolStats(){
+  const n=S.chans.length,by={live:0,film:0,serie:0,radio:0},hosts=new Map(),proto=new Map();let nl=0,ni=0,ng=0,off=0,bad=0;
+  for(const c of S.chans){by[ctype(c)]++;if(!c.attrs['tvg-logo'])nl++;if(!c.attrs['tvg-id'])ni++;if(!grp(c))ng++;if(c.off||S.hidden.has(grp(c)))off++;if(!validUrl(c.url))bad++;
+    try{const u=new URL(c.url);hosts.set(u.host,(hosts.get(u.host)||0)+1);proto.set(u.protocol.replace(':',''),(proto.get(u.protocol.replace(':',''))||0)+1)}catch{}}
+  const d=dupSets();const du=[...d.u.values()].reduce((s,v)=>s+(v>1?v-1:0),0);
+  const top=[...S.counts].sort((a,b)=>b[1]-a[1]).slice(0,12),mx=top[0]?.[1]||1;
+  const stat=(l,v,f)=>`<div class="stat"><small>${l}</small><b>${fmt(v)}</b>${f?`<div><button class="btn sm ghost" data-sf="${f}" style="padding:0;height:auto;color:var(--accent)">Afficher</button></div>`:''}</div>`;
+  const sh=openModal('Statistiques',`<div class="stats">${stat('Chaînes',n)}${stat('Groupes',S.order.length)}${stat('Direct',by.live)}${stat('Films',by.film)}${stat('Séries',by.serie)}${stat('Radio',by.radio)}</div>
+<div class="fs"><h4>À corriger</h4><div class="stats">${stat('Sans logo',nl,nl&&'nologo')}${stat('Sans tvg-id',ni,ni&&'noid')}${stat('Sans groupe',ng,ng&&'nogroup')}${stat('URL invalides',bad,bad&&'badurl')}${stat('URL en double',du,du&&'dupurl')}${stat('Exclues de l’export',off,off&&'off')}</div></div>
+<div class="fs"><h4>Groupes les plus fournis</h4><div style="display:grid;gap:6px">${top.map(([g,v])=>`<div class="bar"><span title="${esc(gLabel(g))}">${esc(gLabel(g))}</span><i style="width:${Math.max(2,v/mx*100)}%"></i><span>${fmt(v)}</span></div>`).join('')}</div></div>
+<div class="two"><div class="fs"><h4>Serveurs</h4><table class="tbl">${[...hosts].sort((a,b)=>b[1]-a[1]).slice(0,8).map(([h,v])=>`<tr><td class="mono">${esc(h)}</td><td class="n">${fmt(v)}</td></tr>`).join('')||'<tr><td class="note">Aucun</td></tr>'}</table></div>
+<div class="fs"><h4>Protocoles</h4><table class="tbl">${[...proto].sort((a,b)=>b[1]-a[1]).map(([h,v])=>`<tr><td class="mono">${esc(h)}</td><td class="n">${fmt(v)}</td></tr>`).join('')||'<tr><td class="note">Aucun</td></tr>'}</table></div></div>`,{wide:true});
+  sh.addEventListener('click',e=>{const b=e.target.closest('[data-sf]');if(!b)return;S.f.state=b.dataset.sf;$('#fs').value=S.f.state;S.f.g='*';closeModal();refresh(false);list.scrollTop=0;renderList()});
+}
+async function toolNew(){if(S.chans.length&&!(await confirmBox(`Vider la playlist (${fmt(S.chans.length)} chaînes) et repartir de zéro ?`,'Vider')))return;
+  mutate(()=>{S.chans=[];S.order=[];S.header={};S.hidden.clear();S.keep.clear();S.sel.clear();S.cur=null;S.f.g='*'});S.name='Ma playlist';$('#pname').value=S.name;autosave()}
+
+/* ============ Lecteur ============ */
+let hlsLib=null,hls=null;
+function loadHls(){if(window.Hls)return Promise.resolve(window.Hls);if(hlsLib)return hlsLib;
+  hlsLib=new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.13/hls.min.js';s.onload=()=>res(window.Hls);s.onerror=()=>{hlsLib=null;rej(new Error('hls.js indisponible'))};document.head.append(s)});return hlsLib}
+function openPlayer(c){
+  if(!c)return;const u=c.url||'';
+  const sh=openModal(c.name||'Lecture',`<video id="vid" controls playsinline></video><div class="fld"><label>Flux</label><div class="inrow"><input class="in mono" value="${esc(u)}" readonly><button class="ib" id="pcp" title="Copier l’URL">${ICON.copy}</button></div></div><p class="note" id="pmsg">Connexion au flux…</p>`,{wide:true});
+  const v=$('#vid',sh),msg=$('#pmsg',sh);$('#pcp',sh).onclick=()=>copyText(u,'URL');
+  sh.parentElement._onclose=()=>{try{hls?.destroy()}catch{}hls=null;v.pause();v.removeAttribute('src');v.load()};
+  const fail=why=>{msg.className='note warn';msg.textContent=why};
+  if(location.protocol==='https:'&&/^http:/i.test(u)){fail('Ce flux est en http alors que l’atelier est en https : le navigateur refuse de le lire. Copiez l’URL et ouvrez-la dans VLC, TiviMate ou Kodi.');return}
+  if(!/^https?:/i.test(u)){fail('Ce protocole ne se lit pas dans un navigateur. Copiez l’URL et ouvrez-la dans VLC ou Kodi.');return}
+  const ok=()=>{msg.className='note';msg.textContent='Lecture en cours. Si l’image n’apparaît pas, le serveur limite sans doute l’accès aux navigateurs.'};
+  v.addEventListener('playing',ok);v.addEventListener('error',()=>fail('Lecture impossible : le format n’est pas pris en charge par le navigateur (MPEG-TS, MKV…) ou le serveur refuse la connexion. '+(inClaude()?'Dans Claude, les flux externes sont bloqués : utilisez la version autonome ou un lecteur IPTV.':'Essayez VLC ou un lecteur IPTV.')));
+  if(/\.m3u8(\?|$)/i.test(u)&&!v.canPlayType('application/vnd.apple.mpegurl')){
+    loadHls().then(H=>{if(!H.isSupported()){fail('Ce navigateur ne sait pas lire le HLS.');return}hls=new H();hls.on(H.Events.ERROR,(e,d)=>{if(d.fatal)fail('Le flux HLS ne répond pas ('+d.details+'). Vérifiez l’URL ou les droits d’accès.')});hls.loadSource(u);hls.attachMedia(v);v.play().catch(()=>{})}).catch(()=>fail('Le lecteur HLS n’a pas pu être chargé.'));
+  }else{v.src=u;v.play().catch(()=>{})}
+}
+
+/* ============ Exemple ============ */
+const SAMPLE=`#EXTM3U url-tvg="https://epg.exemple.net/guide.xml.gz" x-tvg-url="https://epg.exemple.net/guide.xml.gz"
+#EXTINF:-1 tvg-id="info24.fr" tvg-name="Info 24" tvg-chno="1" group-title="FR | Information" catchup="default" catchup-days="7",FR: Info 24 HD
+http://demo.iptv-exemple.net:8080/demo/demo123/1001.ts
+#EXTINF:-1 tvg-id="eco.fr" tvg-name="Éco Direct" tvg-chno="2" group-title="FR | Information",FR: Éco Direct FHD
+http://demo.iptv-exemple.net:8080/demo/demo123/1002.ts
+#EXTINF:-1 tvg-id="" tvg-name="Monde Actu" group-title="FR | Information",|FR| Monde Actu ᴴᴰ
+http://demo.iptv-exemple.net:8080/demo/demo123/1003.ts
+#EXTINF:-1 tvg-id="premiere.fr" tvg-chno="10" group-title="FR | Généralistes",FR: Première HD
+http://demo.iptv-exemple.net:8080/demo/demo123/1010.ts
+#EXTINF:-1 tvg-id="premiere.fr" tvg-chno="10" group-title="FR | Généralistes",FR: Première HD (backup)
+http://demo.iptv-exemple.net:8080/demo/demo123/1010.ts
+#EXTINF:-1 tvg-id="deux.fr" tvg-chno="11" group-title="FR | Généralistes",FR: Deuxième UHD 4K
+http://demo.iptv-exemple.net:8080/demo/demo123/1011.ts
+#EXTINF:-1 tvg-id="region.fr" tvg-chno="12" group-title="FR | Généralistes",FR: Région Est
+http://demo.iptv-exemple.net:8080/demo/demo123/1012.ts
+#EXTINF:-1 tvg-id="arena1.fr" tvg-chno="20" group-title="FR | Sport",FR: Arena Sport 1 FHD ★
+http://demo.iptv-exemple.net:8080/demo/demo123/1020.ts
+#EXTINF:-1 tvg-id="arena2.fr" tvg-chno="21" group-title="FR | Sport",FR: Arena Sport 2 FHD ★
+http://demo.iptv-exemple.net:8080/demo/demo123/1021.ts
+#EXTINF:-1 tvg-id="arena10.fr" tvg-chno="29" group-title="FR | Sport",FR: Arena Sport 10 HEVC
+http://demo.iptv-exemple.net:8080/demo/demo123/1029.ts
+#EXTINF:-1 tvg-id="" group-title="FR | Sport",FR: Golf & Tennis 50 FPS
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (SMART-TV)
+#EXTVLCOPT:http-referrer=https://portail.exemple.net/
+http://demo.iptv-exemple.net:8080/demo/demo123/1030.ts
+#EXTINF:-1 tvg-id="pitchoun.fr" tvg-chno="40" group-title="FR | Jeunesse",FR: Pitchoun TV
+http://demo.iptv-exemple.net:8080/demo/demo123/1040.ts
+#EXTINF:-1 tvg-id="cartoonia.fr" tvg-chno="41" group-title="FR | Jeunesse",FR: Cartoonia HD
+http://demo.iptv-exemple.net:8080/demo/demo123/1041.ts
+#EXTINF:-1 tvg-id="nature.fr" group-title="FR | Découverte",FR: Planète Nature HD
+#KODIPROP:inputstream.adaptive.manifest_type=hls
+https://cdn.exemple.net/live/nature/index.m3u8
+#EXTINF:-1 tvg-id="" group-title="FR | Découverte",FR: Histoire & Civilisations
+https://cdn.exemple.net/live/histoire/index.m3u8
+#EXTINF:-1 group-title="Films | Action",Le Dernier Convoi (2023)
+http://demo.iptv-exemple.net:8080/movie/demo/demo123/5001.mkv
+#EXTINF:-1 group-title="Films | Action",Opération Minuit (2021)
+http://demo.iptv-exemple.net:8080/movie/demo/demo123/5002.mp4
+#EXTINF:-1 group-title="Films | Comédie",Les Voisins du Dessus (2022)
+http://demo.iptv-exemple.net:8080/movie/demo/demo123/5101.mp4
+#EXTINF:-1 group-title="Séries | Policier",Brigade Nord S01 E01
+http://demo.iptv-exemple.net:8080/series/demo/demo123/7001.mkv
+#EXTINF:-1 group-title="Séries | Policier",Brigade Nord S01 E02
+http://demo.iptv-exemple.net:8080/series/demo/demo123/7002.mkv
+#EXTINF:-1 tvg-id="jazzfm" group-title="Radio",Radio Jazz Nocturne
+https://stream.exemple.net/radio/jazz.mp3
+#EXTINF:-1 tvg-id="classique" group-title="Radio",Classique Matin
+https://stream.exemple.net/radio/classique.aac
+#EXTINF:-1,Flux sans groupe
+rtmp://media.exemple.net/live/test
+`;
+
+/* ============ Démarrage ============ */
+function boot(){
+  if(!loadSaved()){const p=parseM3U(SAMPLE);S.header=p.header;S.chans=p.chans;S.name='Exemple de playlist';S.sample=true}
+  try{const vm=localStorage.getItem(LS+':vm');if(vm){S.vm=vm;S.vmAuto=false}}catch{}
+  $('#pname').value=S.name;
+  refresh();
+  if(S.chans.length&&!S.sample&&!S.cur)toast('Votre dernière session a été restaurée');
+}
+boot();
+</script>
