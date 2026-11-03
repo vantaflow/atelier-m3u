@@ -50,7 +50,8 @@ export async function onRequest({ request }) {
     return json(502, "le serveur distant ne répond pas");
   }
   const type = upstream.headers.get("content-type") || "";
-  if (MEDIA_TYPE.test(type)) {
+  // Les playlists sont souvent servies en audio/x-mpegurl ou application/vnd.apple.mpegurl : ce sont des listes, pas des flux.
+  if (MEDIA_TYPE.test(type) && !/mpegurl/i.test(type)) {
     upstream.body?.cancel();
     return json(415, "le relais ne transmet pas les flux vidéo ou audio");
   }
